@@ -1,0 +1,290 @@
+{% extends "admin_base.html" %}
+
+{% block title %}Правительство - Админ-панель Федерации{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Управление правительством</h1>
+</div>
+
+<div class="row">
+    <div class="col-lg-12">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Структура правительства</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 mb-4">
+                        <div class="card bg-dark text-white">
+                            <div class="card-body">
+                                <h5 class="card-title">Верховный правитель</h5>
+                                <p class="card-text">
+                                    <strong>ID:</strong> {{ government.supreme_ruler or 'Не назначен' }}<br>
+                                    <small class="text-muted">Высшая исполнительная власть</small>
+                                </p>
+                                <form id="setSupremeRulerForm" class="mt-2">
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="supremeRulerId" placeholder="ID пользователя">
+                                        <button class="btn btn-outline-warning" type="submit">Назначить</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4 mb-4">
+                        <div class="card bg-dark text-white">
+                            <div class="card-body">
+                                <h5 class="card-title">Канцелярия</h5>
+                                <p class="card-text">
+                                    <strong>Канцлеры:</strong><br>
+                                    {% for chancellor_id in government.chancellery %}
+                                        <span class="badge bg-info me-1">{{ chancellor_id }}</span><br>
+                                    {% else %}
+                                        <em>Пусто</em>
+                                    {% endfor %}
+                                </p>
+                                <form id="addChancellorForm" class="mt-2">
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="chancellorId" placeholder="ID пользователя">
+                                        <button class="btn btn-outline-success" type="submit">Добавить</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4 mb-4">
+                        <div class="card bg-dark text-white">
+                            <div class="card-body">
+                                <h5 class="card-title">Министерства</h5>
+                                <p class="card-text">
+                                    {% for ministry, minister_id in government.ministries.items() %}
+                                        <strong>{{ ministry }}:</strong> {{ minister_id }}<br>
+                                    {% else %}
+                                        <em>Пусто</em>
+                                    {% endfor %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-6">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Назначить министра</h6>
+            </div>
+            <div class="card-body">
+                <form id="setMinisterForm">
+                    <div class="mb-3">
+                        <label for="ministrySelect" class="form-label">Ведомство</label>
+                        <select class="form-select" id="ministrySelect">
+                            <option value="">Выберите ведомство</option>
+                            <option value="defense">Министерство Обороны</option>
+                            <option value="economy">Министерство Экономики</option>
+                            <option value="internal_affairs">Министерство Внутренних Дел</option>
+                            <option value="foreign_affairs">Министерство Иностранных Дел</option>
+                            <option value="intelligence">Министерство Разведки</option>
+                            <option value="justice">Министерство Юстиции</option>
+                            <option value="propaganda">Министерство Пропаганды</option>
+                            <option value="custom">Другое</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="ministerId" class="form-label">ID пользователя</label>
+                        <input type="text" class="form-control" id="ministerId" placeholder="Введите ID пользователя">
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Назначить министра</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Удалить министра</h6>
+            </div>
+            <div class="card-body">
+                <form id="removeMinisterForm">
+                    <div class="mb-3">
+                        <label for="removeMinistrySelect" class="form-label">Ведомство</label>
+                        <select class="form-select" id="removeMinistrySelect">
+                            <option value="">Выберите ведомство</option>
+                            {% for ministry, minister_id in government.ministries.items() %}
+                                <option value="{{ ministry }}">{{ ministry }} ({{ minister_id }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-danger w-100">Удалить министра</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-12">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Канцелярия</h6>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered" id="chancelleryTable">
+                        <thead>
+                            <tr>
+                                <th>ID пользователя</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for chancellor_id in government.chancellery %}
+                            <tr>
+                                <td>{{ chancellor_id }}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-danger remove-chancellor" data-id="{{ chancellor_id }}">Удалить</button>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="2" class="text-center">Канцелярия пуста</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    // Форма назначения верховного правителя
+    $('#setSupremeRulerForm').on('submit', function(e) {
+        e.preventDefault();
+        const userId = $('#supremeRulerId').val().trim();
+        
+        if (!userId) {
+            alert('Пожалуйста, введите ID пользователя');
+            return;
+        }
+        
+        apiRequest('/government/set_supreme_ruler', 'POST', {
+            user_id: userId
+        }, function(response) {
+            if (response.success) {
+                alert('Верховный правитель успешно назначен');
+                $('#government-supreme-ruler').text(userId);
+            } else {
+                alert('Ошибка при назначении верховного правителя: ' + (response.message || ''));
+            }
+        });
+    });
+    
+    // Форма добавления канцлера
+    $('#addChancellorForm').on('submit', function(e) {
+        e.preventDefault();
+        const userId = $('#chancellorId').val().trim();
+        
+        if (!userId) {
+            alert('Пожалуйста, введите ID пользователя');
+            return;
+        }
+        
+        apiRequest('/government/add_chancellor', 'POST', {
+            user_id: userId
+        }, function(response) {
+            if (response.success) {
+                alert('Канцлер успешно добавлен');
+                const newChancellor = `
+                    <tr>
+                        <td>${userId}</td>
+                        <td>
+                            <button class="btn btn-sm btn-danger remove-chancellor" data-id="${userId}">Удалить</button>
+                        </td>
+                    </tr>`;
+                $('#chancelleryTable tbody').append(newChancellor);
+                $('#chancellorId').val('');
+            } else {
+                alert('Ошибка при добавлении канцлера: ' + (response.message || ''));
+            }
+        });
+    });
+    
+    // Форма назначения министра
+    $('#setMinisterForm').on('submit', function(e) {
+        e.preventDefault();
+        const ministry = $('#ministrySelect').val();
+        const userId = $('#ministerId').val().trim();
+        
+        if (!ministry || !userId) {
+            alert('Пожалуйста, заполните все поля');
+            return;
+        }
+        
+        apiRequest('/government/set_minister', 'POST', {
+            ministry: ministry,
+            user_id: userId
+        }, function(response) {
+            if (response.success) {
+                alert('Министр успешно назначен');
+                location.reload();
+            } else {
+                alert('Ошибка при назначении министра: ' + (response.message || ''));
+            }
+        });
+    });
+    
+    // Форма удаления министра
+    $('#removeMinisterForm').on('submit', function(e) {
+        e.preventDefault();
+        const ministry = $('#removeMinistrySelect').val();
+        
+        if (!ministry) {
+            alert('Пожалуйста, выберите ведомство');
+            return;
+        }
+        
+        apiRequest('/government/remove_minister', 'POST', {
+            ministry: ministry
+        }, function(response) {
+            if (response.success) {
+                alert('Министр успешно удален');
+                location.reload();
+            } else {
+                alert('Ошибка при удалении министра: ' + (response.message || ''));
+            }
+        });
+    });
+    
+    // Кнопка удаления канцлера
+    $('.remove-chancellor').on('click', function() {
+        const userId = $(this).data('id');
+        
+        if (confirm('Вы уверены, что хотите удалить этого канцлера?')) {
+            apiRequest('/government/remove_chancellor', 'POST', {
+                user_id: userId
+            }, function(response) {
+                if (response.success) {
+                    $(`button[data-id="${userId}"]`).closest('tr').remove();
+                    alert('Канцлер успешно удален');
+                } else {
+                    alert('Ошибка при удалении канцлера: ' + (response.message || ''));
+                }
+            });
+        }
+    });
+});
+</script>
+{% endblock %}

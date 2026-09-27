@@ -1,0 +1,224 @@
+{% extends "admin_base.html" %}
+
+{% block title %}Настройки - Админ-панель Федерации{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Настройки бота</h1>
+</div>
+
+<form id="settingsForm">
+    <div class="row">
+        <div class="col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Основные настройки</h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="botStatus" class="form-label">Статус бота</label>
+                        <select class="form-select" id="botStatus" name="bot_status">
+                            <option value="online" {% if settings.bot_status == 'online' %}selected{% endif %}>Онлайн</option>
+                            <option value="maintenance" {% if settings.bot_status == 'maintenance' %}selected{% endif %}>Техническое обслуживание</option>
+                            <option value="offline" {% if settings.bot_status == 'offline' %}selected{% endif %}>Оффлайн</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="prefix" class="form-label">Префикс команд</label>
+                        <input type="text" class="form-control" id="prefix" name="prefix" value="{{ settings.prefix }}">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="welcomeMessage" class="form-label">Приветственное сообщение</label>
+                        <textarea class="form-control" id="welcomeMessage" name="welcome_message" rows="3">{{ settings.welcome_message }}</textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Модерация</h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3 form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="autoModeration" name="auto_moderation" {% if settings.auto_moderation %}checked{% endif %}>
+                        <label class="form-check-label" for="autoModeration">Включить автоматическую модерацию</label>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="spamThreshold" class="form-label">Порог спама (сообщений)</label>
+                        <input type="number" class="form-control" id="spamThreshold" name="spam_threshold" value="{{ settings.spam_threshold }}" min="1" max="20">
+                        <div class="form-text">Количество сообщений за короткий промежуток времени для определения спама</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="maxWarnings" class="form-label">Максимальное количество предупреждений</label>
+                        <input type="number" class="form-control" id="maxWarnings" name="max_warnings" value="{{ settings.max_warnings }}" min="1" max="10">
+                        <div class="form-text">Количество предупреждений перед баном</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Экономическая система</h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="dailyCreditsMin" class="form-label">Минимум ежедневных кредитов</label>
+                        <input type="number" class="form-control" id="dailyCreditsMin" name="daily_credits_min" value="{{ settings.daily_credits_min }}" min="1">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="dailyCreditsMax" class="form-label">Максимум ежедневных кредитов</label>
+                        <input type="number" class="form-control" id="dailyCreditsMax" name="daily_credits_max" value="{{ settings.daily_credits_max }}" min="1">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="salaryInterval" class="form-label">Интервал выдачи зарплаты (часы)</label>
+                        <input type="number" class="form-control" id="salaryInterval" name="salary_interval" value="{{ settings.salary_interval }}" min="1">
+                        <div class="form-text">Как часто начисляется зарплата пользователям</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Реклама и продвижение</h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3 form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="advertisingEnabled" name="advertising_enabled" {% if settings.advertising_enabled %}checked{% endif %}>
+                        <label class="form-check-label" for="advertisingEnabled">Включить рекламу Федерации</label>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="adMessage" class="form-label">Рекламное сообщение</label>
+                        <textarea class="form-control" id="adMessage" name="ad_message" rows="3">{{ settings.ad_message }}</textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="adFrequency" class="form-label">Частота рекламы (часы)</label>
+                        <input type="number" class="form-control" id="adFrequency" name="ad_frequency" value="{{ settings.ad_frequency }}" min="1">
+                        <div class="form-text">Как часто показывается рекламное сообщение</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Политические события</h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3 form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="electionsEnabled" name="elections_enabled" {% if settings.elections_enabled %}checked{% endif %}>
+                        <label class="form-check-label" for="electionsEnabled">Включить систему выборов</label>
+                    </div>
+                    
+                    <div class="mb-3 form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="legislationEnabled" name="legislation_enabled" {% if settings.legislation_enabled %}checked{% endif %}>
+                        <label class="form-check-label" for="legislationEnabled">Включить законодательные инициативы</label>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="electionCycle" class="form-label">Цикл выборов (дни)</label>
+                        <input type="number" class="form-control" id="electionCycle" name="election_cycle" value="{{ settings.election_cycle }}" min="7">
+                        <div class="form-text">Частота проведения выборов в днях</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Предпросмотр настроек</h6>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <h6>Префикс команд:</h6>
+                        <p>{{ settings.prefix }}help</p>
+                        
+                        <h6>Приветственное сообщение:</h6>
+                        <p>{{ settings.welcome_message }}</p>
+                        
+                        <h6>Рекламное сообщение:</h6>
+                        <p>{{ settings.ad_message or 'Реклама выключена' }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                <button type="reset" class="btn btn-secondary me-md-2">Сбросить</button>
+                <button type="submit" class="btn btn-primary">Сохранить настройки</button>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    // Форма сохранения настроек
+    $('#settingsForm').on('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = {};
+        $(this).serializeArray().forEach(function(item) {
+            // Преобразуем строковые значения в числа или булевы значения
+            let value = item.value;
+            if (item.name.includes('_min') || item.name.includes('_max') || 
+                item.name.includes('_threshold') || item.name.includes('_interval') ||
+                item.name.includes('_frequency') || item.name.includes('_cycle') ||
+                item.name.includes('_warnings')) {
+                value = parseInt(value);
+            } else if (item.name.includes('_enabled') || item.name.includes('_active')) {
+                value = $('#'+item.name).is(':checked');
+            }
+            formData[item.name] = value;
+        });
+        
+        apiRequest('/settings/update', 'POST', formData, function(response) {
+            if (response.success) {
+                alert('Настройки успешно сохранены');
+            } else {
+                alert('Ошибка при сохранении настроек');
+            }
+        });
+    });
+    
+    // Обновление предпросмотра при изменении полей
+    $('#prefix, #welcomeMessage, #adMessage').on('input', function() {
+        updatePreview();
+    });
+    
+    function updatePreview() {
+        const prefix = $('#prefix').val();
+        const welcome = $('#welcomeMessage').val();
+        const ad = $('#adMessage').val();
+        
+        $('.alert-info h6:contains("Префикс команд:")').next('p').text(prefix + 'help');
+        $('.alert-info h6:contains("Приветственное сообщение:")').next('p').text(welcome);
+        $('.alert-info h6:contains("Рекламное сообщение:")').next('p').text(ad || 'Реклама выключена');
+    }
+});
+</script>
+{% endblock %}

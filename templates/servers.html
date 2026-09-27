@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Серверы Федерации - Галактическая Империя</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            color: #fff;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%23000"/><circle cx="20" cy="30" r="1" fill="%23333"/><circle cx="50" cy="10" r="0.5" fill="%23333"/><circle cx="80" cy="40" r="0.8" fill="%23333"/><circle cx="30" cy="70" r="0.6" fill="%23333"/><circle cx="70" cy="80" r="0.7" fill="%23333"/></svg>');
+            background-size: cover;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        header {
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-bottom: 2px solid #8B0000;
+        }
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #8B0000;
+        }
+        .nav-links {
+            display: flex;
+            gap: 20px;
+        }
+        .nav-links a {
+            color: #fff;
+            text-decoration: none;
+            padding: 10px;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        .nav-links a:hover {
+            background-color: #333;
+        }
+        .page-title {
+            text-align: center;
+            color: #8B0000;
+            margin: 30px 0;
+            font-size: 2.5rem;
+        }
+        .server-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 25px;
+            margin: 30px 0;
+        }
+        .server-card {
+            background-color: rgba(50, 50, 50, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #8B0000;
+            transition: transform 0.3s;
+        }
+        .server-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(139, 0, 0, 0.4);
+        }
+        .server-card h3 {
+            color: #8B0000;
+            margin-top: 0;
+            font-size: 1.4rem;
+        }
+        .server-info {
+            margin: 15px 0;
+        }
+        .server-info p {
+            margin: 8px 0;
+        }
+        .server-status {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 0.9rem;
+            margin-top: 10px;
+        }
+        .status-active {
+            background-color: #006400;
+        }
+        .status-pending {
+            background-color: #FF8C00;
+        }
+        .status-inactive {
+            background-color: #8B0000;
+        }
+        .join-btn {
+            display: inline-block;
+            background-color: #8B0000;
+            color: white;
+            padding: 10px 15px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            margin-top: 10px;
+            transition: background-color 0.3s;
+        }
+        .join-btn:hover {
+            background-color: #A52A2A;
+        }
+        .search-box {
+            background-color: rgba(50, 50, 50, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border: 1px solid #4B0082;
+        }
+        .search-input {
+            width: 100%;
+            padding: 12px;
+            border-radius: 5px;
+            border: 1px solid #555;
+            background-color: #222;
+            color: white;
+            font-size: 16px;
+        }
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            text-align: center;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+        .stat-box {
+            background-color: rgba(70, 0, 0, 0.6);
+            padding: 20px;
+            border-radius: 10px;
+            min-width: 200px;
+            margin: 10px;
+            border: 1px solid #8B0000;
+        }
+        .stat-number {
+            font-size: 2.5rem;
+            color: #8B0000;
+            font-weight: bold;
+        }
+        .stat-label {
+            font-size: 1rem;
+            color: #ccc;
+        }
+        footer {
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            text-align: center;
+            border-top: 2px solid #8B0000;
+            margin-top: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <nav>
+                <div class="logo">Галактическая Империя</div>
+                <div class="nav-links">
+                    <a href="/">Главная</a>
+                    <a href="/features">Функции</a>
+                    <a href="/community_plan">План Сообщества</a>
+                    <a href="/servers">Серверы Федерации</a>
+                    <a href="/join_federation">Присоединиться</a>
+                    <a href="/admin">Админ Панель</a>
+                </div>
+            </nav>
+        </header>
+
+        <h1 class="page-title">Серверы Федерации Галактической Империи</h1>
+
+        <div class="stats">
+            <div class="stat-box">
+                <div class="stat-number">1</div>
+                <div class="stat-label">Главный Сервер</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number">0</div>
+                <div class="stat-label">Федеративных Республик</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number">∞</div>
+                <div class="stat-label">Возможностей</div>
+            </div>
+        </div>
+
+        <div class="search-box">
+            <input type="text" class="search-input" placeholder="Поиск серверов Федерации...">
+        </div>
+
+        <div class="server-list">
+            <div class="server-card">
+                <h3>Нова Сектор</h3>
+                <div class="server-info">
+                    <p><strong>Тип:</strong> Главный Централизованный Сервер</p>
+                    <p><strong>Верховный Правитель:</strong> yochin0837</p>
+                    <p><strong>Описание:</strong> Центральное ядро Федерации, место проведения выборов, принятия законов и управления военными операциями.</p>
+                    <p><strong>Участники:</strong> Администраторы, депутаты, офицеры, граждане</p>
+                </div>
+                <span class="server-status status-active">Активен</span>
+                <br>
+                <a href="#" class="join-btn">Посетить Сервер</a>
+            </div>
+
+            <div class="server-card">
+                <h3>Призрачная Орденс-Хаффа</h3>
+                <div class="server-info">
+                    <p><strong>Тип:</strong> Федеративная Республика</p>
+                    <p><strong>Лидер:</strong> Назначен Верховным Правителем</p>
+                    <p><strong>Описание:</strong> Военная колония, специализирующаяся на подготовке штурмовых отрядов и разведоперациях.</p>
+                    <p><strong>Участники:</strong> Штурмовики, офицеры, разведчики</p>
+                </div>
+                <span class="server-status status-pending">В разработке</span>
+                <br>
+                <a href="#" class="join-btn">Заявка на Вступление</a>
+            </div>
+
+            <div class="server-card">
+                <h3>Мон-Каламари</h3>
+                <div class="server-info">
+                    <p><strong>Тип:</strong> Федеративная Республика</p>
+                    <p><strong>Лидер:</strong> Избираемый Губернатор</p>
+                    <p><strong>Описание:</strong> Морская колония с развитой судостроительной промышленностью и флотом.</p>
+                    <p><strong>Участники:</strong> Инженеры, моряки, дипломаты</p>
+                </div>
+                <span class="server-status status-pending">В разработке</span>
+                <br>
+                <a href="#" class="join-btn">Заявка на Вступление</a>
+            </div>
+
+            <div class="server-card">
+                <h3>Кореллия</h3>
+                <div class="server-info">
+                    <p><strong>Тип:</strong> Федеративная Республика</p>
+                    <p><strong>Лидер:</strong> Избираемый Магистрат</p>
+                    <p><strong>Описание:</strong> Промышленный центр с развитой экономикой и банковской системой.</p>
+                    <p><strong>Участники:</strong> Бизнесмены, банкиры, ремесленники</p>
+                </div>
+                <span class="server-status status-pending">В разработке</span>
+                <br>
+                <a href="#" class="join-btn">Заявка на Вступление</a>
+            </div>
+        </div>
+
+        <div class="server-card" style="grid-column: 1/-1;">
+            <h3>Ваш Сервер Может Быть Следующим!</h3>
+            <p>Хотите создать свою Федеративную Республику и присоединиться к Федерации Галактической Империи?</p>
+            <p>Подайте заявку, и если она будет одобрена, ваш сервер станет частью политико-экономической РП зоны с собственной автономией внутри общей системы.</p>
+            <a href="/join_federation" class="join-btn">Подать Заявку на Вступление</a>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2026 Галактическая Империя. Все права защищены. | Верховный Правитель: yochin0837</p>
+    </footer>
+</body>
+</html>

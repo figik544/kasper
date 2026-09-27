@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Присоединиться к Федерации - Галактическая Империя</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            color: #fff;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%23000"/><circle cx="20" cy="30" r="1" fill="%23333"/><circle cx="50" cy="10" r="0.5" fill="%23333"/><circle cx="80" cy="40" r="0.8" fill="%23333"/><circle cx="30" cy="70" r="0.6" fill="%23333"/><circle cx="70" cy="80" r="0.7" fill="%23333"/></svg>');
+            background-size: cover;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        header {
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-bottom: 2px solid #8B0000;
+        }
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #8B0000;
+        }
+        .nav-links {
+            display: flex;
+            gap: 20px;
+        }
+        .nav-links a {
+            color: #fff;
+            text-decoration: none;
+            padding: 10px;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        .nav-links a:hover {
+            background-color: #333;
+        }
+        .page-title {
+            text-align: center;
+            color: #8B0000;
+            margin: 30px 0;
+            font-size: 2.5rem;
+        }
+        .application-form {
+            background-color: rgba(50, 50, 50, 0.8);
+            padding: 30px;
+            border-radius: 10px;
+            margin: 30px 0;
+            border: 1px solid #8B0000;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #8B0000;
+            font-weight: bold;
+        }
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border-radius: 5px;
+            border: 1px solid #555;
+            background-color: #222;
+            color: white;
+            font-size: 16px;
+        }
+        .form-group textarea {
+            height: 120px;
+            resize: vertical;
+        }
+        .submit-btn {
+            display: block;
+            width: 100%;
+            background-color: #8B0000;
+            color: white;
+            padding: 15px;
+            border: none;
+            border-radius: 5px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .submit-btn:hover {
+            background-color: #A52A2A;
+        }
+        .terms {
+            background-color: rgba(30, 30, 30, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 3px solid #4B0082;
+        }
+        .terms h3 {
+            color: #4B0082;
+            margin-top: 0;
+        }
+        .terms ul {
+            padding-left: 20px;
+        }
+        .terms li {
+            margin: 10px 0;
+        }
+        .agreement {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: rgba(40, 0, 0, 0.6);
+            border-radius: 5px;
+            border: 1px solid #8B0000;
+        }
+        footer {
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            text-align: center;
+            border-top: 2px solid #8B0000;
+            margin-top: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <nav>
+                <div class="logo">Галактическая Империя</div>
+                <div class="nav-links">
+                    <a href="/">Главная</a>
+                    <a href="/features">Функции</a>
+                    <a href="/community_plan">План Сообщества</a>
+                    <a href="/servers">Серверы Федерации</a>
+                    <a href="/join_federation">Присоединиться</a>
+                    <a href="/admin">Админ Панель</a>
+                </div>
+            </nav>
+        </header>
+
+        <h1 class="page-title">Присоединиться к Федерации</h1>
+
+        <div class="terms">
+            <h3>Условия Присоединения к Федерации</h3>
+            <ul>
+                <li>Согласие с политикой авторитарности как основы внутреннего управления</li>
+                <li>Признание верховенства Нова Сектора как главного централизованного сервера</li>
+                <li>Интеграция бота Галактической Империи для синхронизации с центральной системой</li>
+                <li>Соблюдение устава Федерации и внутренних правил сообщества</li>
+                <li>Участие в общих мероприятиях и голосованиях Федерации</li>
+                <li>Сохранение внутренней автономии при подчинении общему законодательству Федерации</li>
+            </ul>
+        </div>
+
+        <div class="application-form">
+            <form action="/join_federation" method="post">
+                <div class="form-group">
+                    <label for="server_name">Название Сервера</label>
+                    <input type="text" id="server_name" name="server_name" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="owner_nickname">Ваш Никнейм (Владелец Сервера)</label>
+                    <input type="text" id="owner_nickname" name="owner_nickname" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="server_type">Тип Федеративной Республики</label>
+                    <select id="server_type" name="server_type" required>
+                        <option value="">Выберите тип...</option>
+                        <option value="military">Военная Колония</option>
+                        <option value="industrial">Промышленный Центр</option>
+                        <option value="diplomatic">Дипломатическая Миссия</option>
+                        <option value="research">Научно-Исследовательский Центр</option>
+                        <option value="trade">Торговая Республика</option>
+                        <option value="other">Другое</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="server_description">Описание Сервера</label>
+                    <textarea id="server_description" name="server_description" placeholder="Расскажите о вашем сервере, его целях, особенностях и почему вы хотите присоединиться к Федерации..." required></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="server_population">Приблизительное Количество Участников</label>
+                    <input type="number" id="server_population" name="server_population" min="1" max="10000">
+                </div>
+                
+                <div class="form-group">
+                    <label for="discord_invite">Ссылка-приглашение на сервер (если доступна)</label>
+                    <input type="url" id="discord_invite" name="discord_invite">
+                </div>
+                
+                <div class="agreement">
+                    <label>
+                        <input type="checkbox" required> Я подтверждаю, что ознакомлен с условиями присоединения к Федерации и принимаю их. Я обязуюсь соблюдать устав Федерации и признавать верховенство Нова Сектора.
+                    </label>
+                </div>
+                
+                <button type="submit" class="submit-btn">Отправить Заявку</button>
+            </form>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2026 Галактическая Империя. Все права защищены. | Верховный Правитель: yochin0837</p>
+    </footer>
+</body>
+</html>

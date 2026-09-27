@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Функции Бота - Галактическая Империя</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            color: #fff;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%23000"/><circle cx="20" cy="30" r="1" fill="%23333"/><circle cx="50" cy="10" r="0.5" fill="%23333"/><circle cx="80" cy="40" r="0.8" fill="%23333"/><circle cx="30" cy="70" r="0.6" fill="%23333"/><circle cx="70" cy="80" r="0.7" fill="%23333"/></svg>');
+            background-size: cover;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        header {
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-bottom: 2px solid #8B0000;
+        }
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #8B0000;
+        }
+        .nav-links {
+            display: flex;
+            gap: 20px;
+        }
+        .nav-links a {
+            color: #fff;
+            text-decoration: none;
+            padding: 10px;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        .nav-links a:hover {
+            background-color: #333;
+        }
+        .page-title {
+            text-align: center;
+            color: #8B0000;
+            margin: 30px 0;
+            font-size: 2.5rem;
+        }
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 30px;
+            margin: 30px 0;
+        }
+        .feature-section {
+            background-color: rgba(50, 50, 50, 0.8);
+            padding: 25px;
+            border-radius: 10px;
+            border: 1px solid #8B0000;
+        }
+        .feature-section h3 {
+            color: #8B0000;
+            margin-top: 0;
+            font-size: 1.5rem;
+        }
+        .command-list {
+            background-color: rgba(30, 30, 30, 0.9);
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            border-left: 3px solid #8B0000;
+        }
+        .command-item {
+            margin: 10px 0;
+            padding: 8px;
+            background-color: rgba(40, 40, 40, 0.7);
+            border-radius: 3px;
+        }
+        .command-name {
+            color: #8B0000;
+            font-weight: bold;
+        }
+        footer {
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            text-align: center;
+            border-top: 2px solid #8B0000;
+            margin-top: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <nav>
+                <div class="logo">Галактическая Империя</div>
+                <div class="nav-links">
+                    <a href="/">Главная</a>
+                    <a href="/features">Функции</a>
+                    <a href="/community_plan">План Сообщества</a>
+                    <a href="/servers">Серверы Федерации</a>
+                    <a href="/join_federation">Присоединиться</a>
+                    <a href="/admin">Админ Панель</a>
+                </div>
+            </nav>
+        </header>
+
+        <h1 class="page-title">Функции Бота Галактической Империи</h1>
+
+        <div class="features-grid">
+            <div class="feature-section">
+                <h3>Модерация</h3>
+                <p>Автоматическая и ручная модерация сервера для поддержания порядка:</p>
+                <div class="command-list">
+                    <div class="command-item">
+                        <span class="command-name">!ban @user [reason]</span> - Заблокировать пользователя
+                    </div>
+                    <div class="command-item">
+                        <span class="command-name">!kick @user [reason]</span> - Выгнать пользователя
+                    </div>
+                    <div class="command-item">
+                        <span class="command-name">!mute @user [time]</span> - Замутить пользователя на время
+                    </div>
+                    <div class="command-item">
+                        <span class="command-name">!warn @user [reason]</span> - Выдать предупреждение
+                    </div>
+                    <div class="command-item">
+                        <span class="command-name">!clear [num]</span> - Очистить сообщения
+                    </div>
+                    <div class="command-item">
+                        <span class="command-name">!warnings @user</span> - Показать предупреждения пользователя
+                    </div>
+                </div>
+                <p>Автоматическое обнаружение спама и применение мер к нарушителям.</p>
+            </div>
+
+            <div class="feature-section">
+                <h3>Экономическая Система</h3>
+                <p>Внутренняя экономика с кредитами, магазином и возможностью торговли:</p>
+                <div class="command-list">
+                    <div class="command-item">
+                        <span class="command-name">!balance [@user]</span> - Проверить баланс кредитов
+                    </div>
+                    <div class="command-item">
+                        <span class="command-name">!daily</span> - Получить ежедневную награду
+                    </div>
+                    <div class="command-item">
+                        <span class="command-name">!shop</span> - Просмотреть имперский рынок
+                    </div>
+                    <div class="command-item">
+                        <span class="command-name">!buy [item]</span> - Купить предмет
+                    </div>
+                    <div class="command-item">
+                        <span class="command-name">!inventory [@user]</span> - Просмотреть инвентарь
+                    </div>
+                    <div class="command-item">
+                        <span class="command-name">!transfer @user [amount]</span> - Перевести кредиты
+                    </div>
+                </div>
+                <p>Система позволяет пользователям зарабатывать, тратить и обмениваться внутриигровыми ресурсами.</p>
+            </div>
+
+            <div class="feature-section">
+                <h3>Система Уровней и Рангов</h3>
+                <p>Прогрессия от рекрута до императора через накопление опыта:</p>
+                <div class="command-list">
+                    <div class="command-item">
+                        <span class="command-name">!profile [@user]</span> - Просмотр профиля
+                    </div>
+                    <div class="command-item">
+                        <span class="command-name">!leaderboard</span> - Таблица лидеров
+                    </div>
+                    <div class="command-item">
+                        <span class="command-name">!rankup</span> - Повысить ранг
+                    </div>
+                    <div class="command-item">
+                        <span class="command-name">!setrank @user [rank]</span> - Установить ранг (админ)
+                    </div>
+                </div>
+                <p>Система рангов вдохновлена военной иерархией Звёздных Войн. От Рекрута до Императора.</p>
+            </div>
+
+            <div class="feature-section">
+                <h3>РП и Игровые Элементы</h3>
+                <p>Ролевые игры, задания и симуляции для полного погружения:</p>
+                <div class="command-list">
+                    <div class="command-item">
+                        <span class="command-name">!char_create [class]</span> - Создать персонажа
+                    </div>
+                    <div class="command-item">
+                        <span class="command-name">!duel @user</span> - Вызвать на дуэль
+                    </div>
+                    <div class="command-item">
+                        <span class="command-name">!quest</span> - Получить задание
+                    </div>
+                    <div class="command-item">
+                        <span class="command-name">!use [item]</span> - Использовать предмет
+                    </div>
+                    <div class="command-item">
+                        <span class="command-name">!lightsaber_color</span> - Цвет светового меча
+                    </div>
+                </div>
+                <p>Возможности для ролевых игр, симуляций сражений и выполнения заданий.</p>
+            </div>
+
+            <div class="feature-section">
+                <h3>Тематика Звёздных Войн</h3>
+                <p>Полное погружение в вселенную Звёздных Войн:</p>
+                <div class="command-list">
+                    <div class="command-item">
+                        <span class="command-name">!faction</span> - Информация о фракциях
+                    </div>
+                    <div class="command-item">
+                        <span class="command-name">!imperial_hierarchy</span> - Имперская иерархия
+                    </div>
+                    <div class="command-item">
+                        <span class="command-name">!galactic_fact</span> - Факт о галактике
+                    </div>
+                    <div class="command-item">
+                        <span class="command-name">!battle_simulator [faction1] [faction2]</span> - Симуляция битвы
+                    </div>
+                    <div class="command-item">
+                        <span class="command-name">!force_ability</span> - Способность Силы
+                    </div>
+                    <div class="command-item">
+                        <span class="command-name">!setup_imperial_server</span> - Настроить сервер как Империю
+                    </div>
+                </div>
+                <p>Создание атмосферы Галактической Империи с соответствующими ролями и каналами.</p>
+            </div>
+
+            <div class="feature-section">
+                <h3>Политико-Экономическая Система</h3>
+                <p>Уникальные функции для политических ролевых игр:</p>
+                <div class="command-list">
+                    <div class="command-item">
+                        <span class="command-name">!create_division</span> - Создать дивизию (с определенного ранга)
+                    </div>
+                    <div class="command-item">
+                        <span class="command-name">!division_chat</span> - Чат дивизии
+                    </div>
+                    <div class="command-item">
+                        <span class="command-name">!elections</span> - Провести выборы
+                    </div>
+                    <div class="command-item">
+                        <span class="command-name">!ministry</span> - Управление министерствами
+                    </div>
+                    <div class="command-item">
+                        <span class="command-name">!salary</span> - Получить зарплату
+                    </div>
+                </div>
+                <p>Система управления, включающая создание военных подразделений, выборы, министерства и экономическую систему.</p>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2026 Галактическая Империя. Все права защищены. | Верховный Правитель: yochin0837</p>
+    </footer>
+</body>
+</html>

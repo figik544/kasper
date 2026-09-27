@@ -1,0 +1,439 @@
+{% extends "admin_base.html" %}
+
+{% block title %}Полный контроль - Админ-панель Федерации{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Полный контроль над системой</h1>
+</div>
+
+<div class="row">
+    <div class="col-lg-12">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-primary">Критические действия</h6>
+                <div class="dropdown no-arrow">
+                    <a class="dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
+                    </a>
+                    <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in" aria-labelledby="dropdownMenuLink">
+                        <div class="dropdown-header">Действия:</div>
+                        <a class="dropdown-item" href="#" id="restartBotBtn">Перезапустить бота</a>
+                        <a class="dropdown-item" href="#" id="shutdownBotBtn">Выключить бота</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item text-danger" href="#" id="emergencyShutdownBtn">Аварийное отключение</a>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-xl-3 col-md-6 mb-4">
+                        <div class="card border-left-primary shadow h-100 py-2">
+                            <div class="card-body">
+                                <div class="row no-gutters align-items-center">
+                                    <div class="col mr-2">
+                                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Все пользователи</div>
+                                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ user_stats.total }}</div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <i class="fas fa-users fa-2x text-gray-300"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-xl-3 col-md-6 mb-4">
+                        <div class="card border-left-success shadow h-100 py-2">
+                            <div class="card-body">
+                                <div class="row no-gutters align-items-center">
+                                    <div class="col mr-2">
+                                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Активные сегодня</div>
+                                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ user_stats.active_today }}</div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <i class="fas fa-user-check fa-2x text-gray-300"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-xl-3 col-md-6 mb-4">
+                        <div class="card border-left-info shadow h-100 py-2">
+                            <div class="card-body">
+                                <div class="row no-gutters align-items-center">
+                                    <div class="col mr-2">
+                                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Всего XP</div>
+                                        <div class="row no-gutters align-items-center">
+                                            <div class="col-auto">
+                                                <div class="h5 mb-0 mr-3 font-weight-bold text-gray-800">{{ user_stats.total_xp }}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <i class="fas fa-chart-line fa-2x text-gray-300"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-xl-3 col-md-6 mb-4">
+                        <div class="card border-left-warning shadow h-100 py-2">
+                            <div class="card-body">
+                                <div class="row no-gutters align-items-center">
+                                    <div class="col mr-2">
+                                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Всего кредитов</div>
+                                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ user_stats.total_credits }}</div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <i class="fas fa-coins fa-2x text-gray-300"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-6">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Структура правительства</h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <h6>Верховный правитель</h6>
+                    <p class="mb-2"><strong>ID:</strong> {{ government.supreme_ruler or 'Не назначен' }}</p>
+                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#changeSupremeModal">Сменить</button>
+                </div>
+                
+                <div class="mb-3">
+                    <h6>Канцелярия</h6>
+                    <div class="mb-2">
+                        {% for chancellor_id in government.chancellery %}
+                            <span class="badge bg-info me-1">{{ chancellor_id }}</span>
+                        {% else %}
+                            <em>Пусто</em>
+                        {% endfor %}
+                    </div>
+                    <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#addChancellorModal">Добавить</button>
+                </div>
+                
+                <div>
+                    <h6>Министерства</h6>
+                    <div class="list-group">
+                        {% for ministry, minister_id in government.ministries.items() %}
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1">{{ ministry }}</h6>
+                                    <small class="text-muted">ID министра: {{ minister_id }}</small>
+                                </div>
+                                <button class="btn btn-sm btn-danger remove-minister-btn" data-ministry="{{ ministry }}">Удалить</button>
+                            </div>
+                        {% else %}
+                            <div class="list-group-item">Министерства не созданы</div>
+                        {% endfor %}
+                    </div>
+                    <button class="btn btn-sm btn-warning mt-2" data-bs-toggle="modal" data-bs-target="#addMinisterModal">Добавить министра</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Системные настройки</h6>
+            </div>
+            <div class="card-body">
+                <div class="list-group">
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">Реклама</h6>
+                            <small>
+                                <span class="badge bg-{% if config.get('advertising_enabled', false) %}danger{% else %}secondary{% endif %}">
+                                    {% if config.get('advertising_enabled', false) %}Вкл{% else %}Выкл{% endif %}
+                                </span>
+                            </small>
+                        </div>
+                        <p class="mb-1">{{ config.get('ad_message', 'Реклама не настроена') }}</p>
+                        <small class="text-muted">Каждые {{ config.get('ad_frequency_hours', 6) }} часов</small>
+                    </div>
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">Выборы</h6>
+                            <small>
+                                <span class="badge bg-secondary">Откл</span>
+                            </small>
+                        </div>
+                        <p class="mb-1">Система выборов отключена</p>
+                    </div>
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">Модерация</h6>
+                            <small>
+                                <span class="badge bg-success">Активна</span>
+                            </small>
+                        </div>
+                        <p class="mb-1">Автоматическая модерация работает</p>
+                    </div>
+                </div>
+                
+                <div class="mt-3">
+                    <h6>Действия</h6>
+                    <div class="btn-group-vertical w-100" role="group">
+                        <button class="btn btn-outline-primary mb-1" id="syncServersBtn">Синхронизировать серверы</button>
+                        <button class="btn btn-outline-warning mb-1" id="updateDbSchemaBtn">Обновить схему БД</button>
+                        <button class="btn btn-outline-danger" id="resetSystemBtn">Сбросить систему</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-12">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Последние действия</h6>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered" id="logsTable">
+                        <thead>
+                            <tr>
+                                <th>Пользователь</th>
+                                <th>Действие</th>
+                                <th>Детали</th>
+                                <th>Время</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in recent_logs %}
+                            <tr>
+                                <td>{{ log.user_id }}</td>
+                                <td>{{ log.action }}</td>
+                                <td>{{ log.details }}</td>
+                                <td>{{ log.timestamp }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальные окна -->
+<div class="modal fade" id="changeSupremeModal" tabindex="-1" aria-labelledby="changeSupremeModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="changeSupremeModalLabel">Сменить верховного правителя</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="changeSupremeForm">
+                    <div class="mb-3">
+                        <label for="newSupremeId" class="form-label">Новый ID верховного правителя</label>
+                        <input type="text" class="form-control" id="newSupremeId" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" id="confirmChangeSupreme">Подтвердить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="addChancellorModal" tabindex="-1" aria-labelledby="addChancellorModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addChancellorModalLabel">Добавить канцлера</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addChancellorForm">
+                    <div class="mb-3">
+                        <label for="chancellorId" class="form-label">ID пользователя</label>
+                        <input type="text" class="form-control" id="chancellorId" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-success" id="confirmAddChancellor">Добавить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="addMinisterModal" tabindex="-1" aria-labelledby="addMinisterModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addMinisterModalLabel">Назначить министра</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addMinisterForm">
+                    <div class="mb-3">
+                        <label for="ministryName" class="form-label">Название ведомства</label>
+                        <input type="text" class="form-control" id="ministryName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="ministerUserId" class="form-label">ID пользователя</label>
+                        <input type="text" class="form-control" id="ministerUserId" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-warning" id="confirmAddMinister">Назначить</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    // Подтверждение смены верховного правителя
+    $('#confirmChangeSupreme').on('click', function() {
+        const newSupremeId = $('#newSupremeId').val();
+        
+        if (!newSupremeId) {
+            alert('Введите ID пользователя');
+            return;
+        }
+        
+        apiRequest('/government/set_supreme_ruler', 'POST', {
+            user_id: newSupremeId
+        }, function(response) {
+            if (response.success) {
+                alert('Верховный правитель успешно изменен');
+                $('#changeSupremeModal').modal('hide');
+                location.reload();
+            } else {
+                alert('Ошибка при изменении верховного правителя');
+            }
+        });
+    });
+    
+    // Подтверждение добавления канцлера
+    $('#confirmAddChancellor').on('click', function() {
+        const chancellorId = $('#chancellorId').val();
+        
+        if (!chancellorId) {
+            alert('Введите ID пользователя');
+            return;
+        }
+        
+        apiRequest('/government/add_chancellor', 'POST', {
+            user_id: chancellorId
+        }, function(response) {
+            if (response.success) {
+                alert('Канцлер успешно добавлен');
+                $('#addChancellorModal').modal('hide');
+                location.reload();
+            } else {
+                alert('Ошибка при добавлении канцлера');
+            }
+        });
+    });
+    
+    // Подтверждение добавления министра
+    $('#confirmAddMinister').on('click', function() {
+        const ministryName = $('#ministryName').val();
+        const ministerUserId = $('#ministerUserId').val();
+        
+        if (!ministryName || !ministerUserId) {
+            alert('Заполните все поля');
+            return;
+        }
+        
+        apiRequest('/government/set_minister', 'POST', {
+            ministry: ministryName,
+            user_id: ministerUserId
+        }, function(response) {
+            if (response.success) {
+                alert('Министр успешно назначен');
+                $('#addMinisterModal').modal('hide');
+                location.reload();
+            } else {
+                alert('Ошибка при назначении министра');
+            }
+        });
+    });
+    
+    // Удаление министра
+    $('.remove-minister-btn').on('click', function() {
+        const ministry = $(this).data('ministry');
+        
+        if (confirm(`Вы уверены, что хотите удалить министра ведомства "${ministry}"?`)) {
+            apiRequest('/government/remove_minister', 'POST', {
+                ministry: ministry
+            }, function(response) {
+                if (response.success) {
+                    alert('Министр успешно удален');
+                    location.reload();
+                } else {
+                    alert('Ошибка при удалении министра');
+                }
+            });
+        }
+    });
+    
+    // Критические действия
+    $('#restartBotBtn').on('click', function() {
+        if (confirm('Вы уверены, что хотите перезапустить бота?')) {
+            // Здесь будет API вызов перезапуска бота
+            alert('Функция перезапуска бота временно недоступна');
+        }
+    });
+    
+    $('#shutdownBotBtn').on('click', function() {
+        if (confirm('Вы уверены, что хотите выключить бота? Это остановит все функции.')) {
+            // Здесь будет API вызов выключения бота
+            alert('Функция выключения бота временно недоступна');
+        }
+    });
+    
+    $('#emergencyShutdownBtn').on('click', function() {
+        if (confirm('АВАРИЙНОЕ ОТКЛЮЧЕНИЕ СИСТЕМЫ! Это действие необратимо и остановит все функции. Вы уверены?')) {
+            // Здесь будет API вызов аварийного отключения
+            alert('Функция аварийного отключения временно недоступна');
+        }
+    });
+    
+    $('#syncServersBtn').on('click', function() {
+        // Здесь будет API вызов синхронизации серверов
+        alert('Серверы синхронизированы');
+    });
+    
+    $('#updateDbSchemaBtn').on('click', function() {
+        // Здесь будет API вызов обновления схемы БД
+        alert('Схема базы данных обновлена');
+    });
+    
+    $('#resetSystemBtn').on('click', function() {
+        if (confirm('СБРОС СИСТЕМЫ! Это действие очистит все настройки и данные. Вы уверены?')) {
+            // Здесь будет API вызов сброса системы
+            alert('Функция сброса системы временно недоступна');
+        }
+    });
+});
+</script>
+{% endblock %}

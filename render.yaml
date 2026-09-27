@@ -1,0 +1,15 @@
+services:
+- type: web
+  name: galactic-empire-bot
+  env: docker
+  region: frankfurt  # или любой другой регион на твой выбор
+  plan: free
+  branch: main
+  healthCheckPath: /
+  envVars:
+  - key: PYTHON_VERSION
+    value: 3.9
+  - key: DISCORD_BOT_TOKEN
+    sync: false  # будет установлено вручную в интерфейсе Render
+  - key: DATABASE_URL
+    sync: false  # будет установлено вручную в интерфейсе Render

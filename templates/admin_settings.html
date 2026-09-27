@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Настройки - Админ-панель Империи</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            color: #fff;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%23000"/><circle cx="20" cy="30" r="1" fill="%23333"/><circle cx="50" cy="10" r="0.5" fill="%23333"/><circle cx="80" cy="40" r="0.8" fill="%23333"/><circle cx="30" cy="70" r="0.6" fill="%23333"/><circle cx="70" cy="80" r="0.7" fill="%23333"/></svg>');
+            background-size: cover;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        header {
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-bottom: 2px solid #8B0000;
+        }
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #8B0000;
+        }
+        .nav-links {
+            display: flex;
+            gap: 20px;
+        }
+        .nav-links a {
+            color: #fff;
+            text-decoration: none;
+            padding: 10px;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        .nav-links a:hover {
+            background-color: #333;
+        }
+        .page-title {
+            text-align: center;
+            color: #8B0000;
+            margin: 30px 0;
+            font-size: 2.5rem;
+        }
+        .settings-container {
+            background-color: rgba(50, 50, 50, 0.8);
+            padding: 30px;
+            border-radius: 10px;
+            margin: 30px 0;
+            border: 1px solid #8B0000;
+        }
+        .setting-group {
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #555;
+        }
+        .setting-group:last-child {
+            border-bottom: none;
+        }
+        .setting-group h3 {
+            color: #8B0000;
+            margin-top: 0;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #8B0000;
+            font-weight: bold;
+        }
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border-radius: 5px;
+            border: 1px solid #555;
+            background-color: #222;
+            color: white;
+            font-size: 16px;
+        }
+        .form-group textarea {
+            height: 100px;
+            resize: vertical;
+        }
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #8B0000;
+        }
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        .save-btn {
+            display: block;
+            width: 200px;
+            background-color: #8B0000;
+            color: white;
+            padding: 15px;
+            border: none;
+            border-radius: 5px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin-top: 20px;
+        }
+        .save-btn:hover {
+            background-color: #A52A2A;
+        }
+        footer {
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            text-align: center;
+            border-top: 2px solid #8B0000;
+            margin-top: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <nav>
+                <div class="logo">Админ-панель Империи</div>
+                <div class="nav-links">
+                    <a href="/">Главная</a>
+                    <a href="/admin/panel">Панель</a>
+                    <a href="/admin/settings">Настройки</a>
+                    <a href="/admin/servers">Серверы</a>
+                    <a href="/logout">Выйти</a>
+                </div>
+            </nav>
+        </header>
+
+        <h1 class="page-title">Настройки Бота и Федерации</h1>
+
+        <div class="settings-container">
+            <form action="/admin/settings" method="post">
+                <div class="setting-group">
+                    <h3>Основные Настройки</h3>
+                    
+                    <div class="form-group">
+                        <label for="bot_status">Статус Бота</label>
+                        <select id="bot_status" name="bot_status">
+                            <option value="online">Онлайн</option>
+                            <option value="maintenance">Техническое обслуживание</option>
+                            <option value="offline">Оффлайн</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="prefix">Префикс Команд</label>
+                        <input type="text" id="prefix" name="prefix" value="!" placeholder="Введите префикс команд">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="welcome_message">Приветственное Сообщение</label>
+                        <textarea id="welcome_message" name="welcome_message" placeholder="Сообщение, которое отправляется новым участникам">Добро пожаловать в Галактическую Империю, солдат! Твоя преданность будет вознаграждена.</textarea>
+                    </div>
+                </div>
+                
+                <div class="setting-group">
+                    <h3>Модерация</h3>
+                    
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" name="auto_moderation" checked>
+                            Включить автоматическую модерацию
+                        </label>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="spam_threshold">Порог спама (сообщений)</label>
+                        <input type="number" id="spam_threshold" name="spam_threshold" value="5" min="1" max="20">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="max_warnings">Максимальное количество предупреждений перед баном</label>
+                        <input type="number" id="max_warnings" name="max_warnings" value="5" min="1" max="10">
+                    </div>
+                </div>
+                
+                <div class="setting-group">
+                    <h3>Экономическая Система</h3>
+                    
+                    <div class="form-group">
+                        <label for="daily_credits_min">Минимум ежедневных кредитов</label>
+                        <input type="number" id="daily_credits_min" name="daily_credits_min" value="50" min="1">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="daily_credits_max">Максимум ежедневных кредитов</label>
+                        <input type="number" id="daily_credits_max" name="daily_credits_max" value="150" min="1">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="salary_interval">Интервал выдачи зарплаты (часы)</label>
+                        <input type="number" id="salary_interval" name="salary_interval" value="24" min="1">
+                    </div>
+                </div>
+                
+                <div class="setting-group">
+                    <h3>Реклама и Продвижение</h3>
+                    
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" name="advertising_enabled" checked>
+                            Включить рекламу Федерации
+                        </label>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="ad_message">Сообщение рекламы</label>
+                        <textarea id="ad_message" name="ad_message" placeholder="Рекламное сообщение Федерации">Присоединяйся к Федерации Галактической Империи! Политико-экономическая РП зона с реальной внутренней политикой, военными подразделениями и демократическими процессами.</textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="ad_frequency">Частота рекламы (часы)</label>
+                        <input type="number" id="ad_frequency" name="ad_frequency" value="6" min="1">
+                    </div>
+                </div>
+                
+                <div class="setting-group">
+                    <h3>Политические События</h3>
+                    
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" name="elections_enabled">
+                            Включить систему выборов
+                        </label>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" name="legislation_enabled">
+                            Включить законодательные инициативы
+                        </label>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="election_cycle">Цикл выборов (дни)</label>
+                        <input type="number" id="election_cycle" name="election_cycle" value="30" min="7">
+                    </div>
+                </div>
+                
+                <button type="submit" class="save-btn">Сохранить</button>
+            </form>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2026 Галактическая Империя. Админ-панель. | Верховный Правитель: yochin0837</p>
+    </footer>
+</body>
+</html>

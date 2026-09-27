@@ -1,0 +1,29 @@
+{
+  "name": "galactic-empire-bot-api",
+  "version": "1.0.0",
+  "description": "API для управления Discord ботом Федерации Галактической Империи",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "node --test"
+  },
+  "keywords": [
+    "discord",
+    "bot",
+    "star-wars",
+    "federation",
+    "cloudflare-workers",
+    "hono",
+    "api"
+  ],
+  "author": "yochin0837",
+  "license": "MIT",
+  "dependencies": {
+    "hono": "^4.0.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20231218.0",
+    "wrangler": "^3.0.0"
+  }
+}
