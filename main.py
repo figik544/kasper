@@ -92,6 +92,8 @@ BOT_TOKEN = os.getenv('DISCORD_BOT_TOKEN', config.get('bot_token', ''))
 if not BOT_TOKEN:
     print("Ошибка: Токен бота не найден! Установите переменную окружения DISCORD_BOT_TOKEN или укажите токен в config.json.")
     exit(1)
+else:
+    print(f"Токен загружен, длина: {len(BOT_TOKEN)} символов")
 
 # Настройка интентов
 intents = discord.Intents.default()
@@ -542,6 +544,7 @@ async def change_government(ctx, action: str, target: str = None, user: discord.
 if __name__ == "__main__":
     # Запуск бота с токеном
     try:
+        print("Попытка запуска бота...")
         bot.run(BOT_TOKEN)
     except discord.LoginFailure:
         print("Ошибка: Неверный токен бота. Пожалуйста, проверьте значение токена в config.json или переменной окружения DISCORD_BOT_TOKEN.")
