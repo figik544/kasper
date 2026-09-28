@@ -1,19 +1,8 @@
-__pycache__
-*.pyc
-*.pyo
-*.pyd
-env/
-.git
-.vscode/
-*.md
-*.log
 FROM python:3.9-slim
 
 WORKDIR /app
 
-# Install system dependencies for PyNaCl
-# These dependencies are necessary for building and running packages
-# like PyNaCl that require compilation of C extensions.
+# Установка системных зависимостей для PyNaCl
 RUN apt-get update && apt-get install -y \
     build-essential \
     libffi-dev \
