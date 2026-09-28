@@ -1,5 +1,6 @@
 import json
 import os
+import asyncio
 import tempfile
 import urllib.request
 import unittest
@@ -29,6 +30,25 @@ class ConfigLoaderTests(unittest.TestCase):
         finally:
             server.shutdown()
             server.server_close()
+
+    def test_setup_hook_loads_command_extensions(self):
+        async def load_and_check():
+            bot = main.bot
+            try:
+                await bot.setup_hook()
+                for command_name in (
+                    'warn', 'balance', 'profile', 'char_create',
+                    'faction', 'help', 'about',
+                ):
+                    self.assertIn(command_name, bot.all_commands)
+                help_cog = bot.get_cog('Помощь')
+                listing = help_cog.command_listing()
+                self.assertIn('!quest', listing)
+                self.assertIn('!change_government', listing)
+            finally:
+                await bot.close()
+
+        asyncio.run(load_and_check())
 
     def test_load_config_merges_defaults(self):
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -133,7 +133,12 @@ intents.members = True
 intents.reactions = True
 
 # Инициализация бота
-bot = commands.Bot(command_prefix=config['default_prefix'], intents=intents, owner_id=int(config['government_structure']['supreme_ruler']))
+class EmpireBot(commands.Bot):
+    async def setup_hook(self):
+        await load_extensions(self)
+
+
+bot = EmpireBot(command_prefix=config['default_prefix'], intents=intents, owner_id=int(config['government_structure']['supreme_ruler']))
 bot.remove_command('help')
 
 # Глобальные переменные
@@ -141,20 +146,19 @@ advertising_task = None
 current_government = config['government_structure']
 
 # Загрузка расширений (модулей)
-async def load_extensions():
+async def load_extensions(bot_instance):
     extensions = [
         'modules.moderation',
         'modules.economy',
         'modules.levels',
         'modules.rpg',
         'modules.star_wars',
-        'modules.database',
         'modules.help'
     ]
     
     for extension in extensions:
         try:
-            await bot.load_extension(extension)
+            await bot_instance.load_extension(extension)
             print(f"Загружено расширение: {extension}")
         except Exception as e:
             print(f"Ошибка при загрузке расширения {extension}: {e}")

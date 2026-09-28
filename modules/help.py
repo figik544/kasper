@@ -11,6 +11,19 @@ class HelpCog(commands.Cog, name="Помощь"):
     def __init__(self, bot):
         self.bot = bot
 
+    def command_listing(self):
+        prefix = config.get('default_prefix', '!')
+        lines = []
+        for command in sorted(self.bot.commands, key=lambda item: item.name):
+            if command.hidden:
+                continue
+            usage = f"{prefix}{command.qualified_name}"
+            if command.signature:
+                usage = f"{usage} {command.signature}"
+            description = command.short_doc or "Команда бота"
+            lines.append(f"`{usage}` — {description}")
+        return "\n".join(lines)
+
     @commands.command(name='help')
     async def help_command(self, ctx, module_name: str = None):
         """Показывает список команд или информацию о конкретном модуле"""
@@ -18,36 +31,9 @@ class HelpCog(commands.Cog, name="Помощь"):
             # Показываем общую помощь
             embed = discord.Embed(
                 title="Помощь - Галактический Имперский Бот",
-                description="Команды, доступные для служения Империи",
+                description=self.command_listing(),
                 color=0x000000
             )
-            
-            embed.add_field(name="!profile [@user]", value="Просмотр профиля пользователя с его статистикой", inline=False)
-            embed.add_field(name="!leaderboard", value="Просмотр топа Имперских офицеров", inline=False)
-            embed.add_field(name="!daily", value="Получить ежедневную награду", inline=False)
-            embed.add_field(name="!balance [@user]", value="Проверить баланс кредитов", inline=False)
-            embed.add_field(name="!rankup", value="Попытаться получить более высокий ранг", inline=False)
-            embed.add_field(name="!shop", value="Просмотреть имперский рынок", inline=False)
-            embed.add_field(name="!buy [item]", value="Купить предметы за кредиты", inline=False)
-            embed.add_field(name="!inventory [@user]", value="Просмотреть инвентарь", inline=False)
-            embed.add_field(name="!faction", value="Информация о фракциях в галактике", inline=False)
-            embed.add_field(name="!lightsaber_color", value="Определить цвет светового меча", inline=False)
-            embed.add_field(name="!imperial_hierarchy", value="Показать имперскую иерархию", inline=False)
-            embed.add_field(name="!galactic_fact", value="Интересный факт о галактике", inline=False)
-            
-            if ctx.author.guild_permissions.administrator:
-                embed.add_field(name="АДМИН КОМАНДЫ:", value=" ", inline=False)
-                embed.add_field(name="!ban @user [reason]", value="Заблокировать пользователя", inline=False)
-                embed.add_field(name="!kick @user [reason]", value="Выгнать пользователя", inline=False)
-                embed.add_field(name="!mute @user [time]", value="Замутить пользователя", inline=False)
-                embed.add_field(name="!warn @user [reason]", value="Выдать предупреждение", inline=False)
-                embed.add_field(name="!clear [num]", value="Очистить сообщения", inline=False)
-                embed.add_field(name="!setrank @user [rank]", value="Установить ранг пользователю", inline=False)
-                embed.add_field(name="!givecredits @user [amount]", value="Выдать кредиты", inline=False)
-                embed.add_field(name="!setup_imperial_server", value="Настроить сервер в стиле Империи", inline=False)
-            
-            embed.add_field(name="!help [module]", value="Показать помощь по конкретному модулю", inline=False)
-            
             await ctx.send(embed=embed)
         else:
             # Показываем помощь по конкретному модулю
