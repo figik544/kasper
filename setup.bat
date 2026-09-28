@@ -13,6 +13,6 @@ echo Dependencies installed successfully!
 echo.
 echo Please configure your bot token in config.json before running the bot.
 echo.
-echo To run the bot, execute: python bot.py
+echo To run the bot, execute: python main.py
 echo.
 pause

@@ -999,4 +999,8 @@ async def help_command(ctx):
 
 # Run the bot
 if __name__ == "__main__":
-    bot.run(config['bot_token'])
+    environment_token = os.getenv('DISCORD_BOT_TOKEN')
+    token = (environment_token or config.get('bot_token') or '').strip()
+    if not token:
+        raise SystemExit("Set DISCORD_BOT_TOKEN or bot_token in config.json before starting the bot.")
+    bot.run(token)

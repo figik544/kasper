@@ -1,8 +1,10 @@
 import json
 import os
 import tempfile
+import urllib.request
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import main
 
@@ -11,6 +13,22 @@ class ConfigLoaderTests(unittest.TestCase):
     def test_resolve_bot_token_prefers_non_empty_environment_value(self):
         self.assertEqual(main.resolve_bot_token(' env-token ', 'config-token'), 'env-token')
         self.assertEqual(main.resolve_bot_token('   ', ' config-token '), 'config-token')
+        self.assertEqual(main.resolve_bot_token('', ''), '')
+
+    def test_health_server_serves_render_root_check(self):
+        with patch.dict(os.environ, {'PORT': '0'}):
+            server = main.start_health_server()
+
+        try:
+            self.assertIsNotNone(server)
+            with urllib.request.urlopen(
+                f'http://127.0.0.1:{server.server_address[1]}/'
+            ) as response:
+                self.assertEqual(response.status, 200)
+                self.assertEqual(response.read(), b'OK')
+        finally:
+            server.shutdown()
+            server.server_close()
 
     def test_load_config_merges_defaults(self):
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -6,6 +6,8 @@ from datetime import datetime, timedelta
 import asyncio
 import aiosqlite
 import logging
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from enum import Enum
 
 # Настройка логирования
@@ -88,14 +90,41 @@ def resolve_bot_token(environment_token, config_token):
     return (environment_token or '').strip() or (config_token or '').strip()
 
 
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path != '/':
+            self.send_error(404)
+            return
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b'OK')
+
+    def log_message(self, format, *args):
+        return
+
+
+def start_health_server():
+    port = os.getenv('PORT')
+    if not port:
+        return None
+
+    server = ThreadingHTTPServer(('0.0.0.0', int(port)), HealthCheckHandler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server
+
+
 config = load_config()
 
 # Получение токена из переменной окружения или файла конфигурации
-BOT_TOKEN = resolve_bot_token(os.getenv('DISCORD_BOT_TOKEN'), config.get('bot_token', ''))
+environment_token = os.getenv('DISCORD_BOT_TOKEN')
+BOT_TOKEN = resolve_bot_token(environment_token, config.get('bot_token', ''))
+token_source = 'DISCORD_BOT_TOKEN' if environment_token and environment_token.strip() else 'config.json'
 
 if not BOT_TOKEN:
     print("Ошибка: Токен бота не найден! Установите переменную окружения DISCORD_BOT_TOKEN или укажите токен в config.json.")
     exit(1)
+else:
+    print(f"Токен загружен из {token_source} ({len(BOT_TOKEN)} символов). Значение скрыто.")
 
 # Настройка интентов
 intents = discord.Intents.default()
@@ -546,10 +575,11 @@ async def change_government(ctx, action: str, target: str = None, user: discord.
 if __name__ == "__main__":
     # Запуск бота с токеном
     try:
+        start_health_server()
         print("Попытка запуска бота...")
         bot.run(BOT_TOKEN)
     except discord.LoginFailure:
-        print("Ошибка входа в Discord: токен отклонён. Укажите Bot Token из раздела Bot в Developer Portal, обновите DISCORD_BOT_TOKEN в Render и перезапустите сервис.")
+        print(f"Ошибка входа в Discord: токен из {token_source} ({len(BOT_TOKEN)} символов) отклонён. Сам токен не выводится.")
         exit(1)
     except Exception as e:
         print(f"Ошибка при запуске бота: {e}")

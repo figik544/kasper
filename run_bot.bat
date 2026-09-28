@@ -2,11 +2,11 @@
 echo Starting Galactic Empire Discord Bot...
 echo.
 
-python bot.py
+python main.py
 
 if %errorlevel% neq 0 (
     echo The bot failed to start. Please check the error messages above.
-    echo Make sure you have configured your bot token in config.json.
+    echo Configure DISCORD_BOT_TOKEN or the bot_token value in config.json.
     pause
     exit /b %errorlevel%
 )
