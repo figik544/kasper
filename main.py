@@ -84,16 +84,18 @@ def load_config(path='config.json'):
     return merged
 
 
+def resolve_bot_token(environment_token, config_token):
+    return (environment_token or '').strip() or (config_token or '').strip()
+
+
 config = load_config()
 
 # Получение токена из переменной окружения или файла конфигурации
-BOT_TOKEN = os.getenv('DISCORD_BOT_TOKEN', config.get('bot_token', ''))
+BOT_TOKEN = resolve_bot_token(os.getenv('DISCORD_BOT_TOKEN'), config.get('bot_token', ''))
 
 if not BOT_TOKEN:
     print("Ошибка: Токен бота не найден! Установите переменную окружения DISCORD_BOT_TOKEN или укажите токен в config.json.")
     exit(1)
-else:
-    print(f"Токен загружен, длина: {len(BOT_TOKEN)} символов")
 
 # Настройка интентов
 intents = discord.Intents.default()
@@ -547,7 +549,7 @@ if __name__ == "__main__":
         print("Попытка запуска бота...")
         bot.run(BOT_TOKEN)
     except discord.LoginFailure:
-        print("Ошибка: Неверный токен бота. Пожалуйста, проверьте значение токена в config.json или переменной окружения DISCORD_BOT_TOKEN.")
+        print("Ошибка входа в Discord: токен отклонён. Укажите Bot Token из раздела Bot в Developer Portal, обновите DISCORD_BOT_TOKEN в Render и перезапустите сервис.")
         exit(1)
     except Exception as e:
         print(f"Ошибка при запуске бота: {e}")

@@ -3,6 +3,9 @@
 .env.local
 .env.*.local
 
+# Local secrets and configuration
+config.json
+
 # Virtual Environment
 venv/
 env/
