@@ -11,9 +11,9 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
-# Установка системных зависимостей для PyNaCl
-# Эти зависимости необходимы для сборки и запуска пакетов,
-# таких как PyNaCl, которые требуют компиляции C-расширений.
+# Install system dependencies for PyNaCl
+# These dependencies are necessary for building and running packages
+# like PyNaCl that require compilation of C extensions.
 RUN apt-get update && apt-get install -y \
     build-essential \
     libffi-dev \

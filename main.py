@@ -7,6 +7,9 @@ import asyncio
 import aiosqlite
 import logging
 from enum import Enum
+from http.server import BaseHTTPRequestHandler
+from http.server import HTTPServer
+import threading
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -106,7 +109,7 @@ def start_health_server():
     if not port:
         return None
 
-    server = ThreadingHTTPServer(('0.0.0.0', int(port)), HealthCheckHandler)
+    server = HTTPServer(('0.0.0.0', int(port)), HealthCheckHandler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     return server
 
