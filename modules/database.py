@@ -5,7 +5,15 @@ from datetime import datetime
 class Database:
     def __init__(self):
         self.db_path = 'database.db'
-        self.init_db()
+        # Инициализируем базу данных при создании экземпляра класса
+        import asyncio
+        try:
+            loop = asyncio.get_running_loop()
+            # Если цикл уже запущен, создаем задачу
+            loop.create_task(self.init_db())
+        except RuntimeError:
+            # Если цикл не запущен, можно безопасно использовать run
+            asyncio.run(self.init_db())
 
     async def init_db(self):
         """Инициализация базы данных"""
