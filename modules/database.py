@@ -1,255 +1,264 @@
-import sqlite3
-import os
-from datetime import datetime
 import aiosqlite
+import json
+from datetime import datetime
 
-DATABASE_PATH = 'galactic_empire_bot.db'
+class Database:
+    def __init__(self):
+        self.db_path = 'database.db'
+        self.init_db()
 
-async def init_db():
-    """Инициализация базы данных"""
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        # Создание таблиц для профилей пользователей
-        await db.execute('''CREATE TABLE IF NOT EXISTS users (
-                            user_id INTEGER PRIMARY KEY,
-                            guild_id INTEGER,
-                            level INTEGER DEFAULT 1,
-                            xp INTEGER DEFAULT 0,
-                            credits INTEGER DEFAULT 0,
-                            rank TEXT DEFAULT 'Recruit',
-                            join_date TEXT,
-                            last_daily_claim TEXT,
-                            warnings INTEGER DEFAULT 0,
-                            FOREIGN KEY (guild_id) REFERENCES guilds(guild_id)
-                        )''')
-        
-        # Создание таблицы для настроек сервера
-        await db.execute('''CREATE TABLE IF NOT EXISTS guilds (
-                            guild_id INTEGER PRIMARY KEY,
-                            admin_role_id INTEGER,
-                            mod_role_id INTEGER,
-                            mute_role_id INTEGER,
-                            log_channel_id INTEGER,
-                            autorank_enabled BOOLEAN DEFAULT 1,
-                            economy_enabled BOOLEAN DEFAULT 1
-                        )''')
-        
-        # Создание таблицы для предупреждений
-        await db.execute('''CREATE TABLE IF NOT EXISTS warnings (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            user_id INTEGER,
-                            guild_id INTEGER,
-                            moderator_id INTEGER,
-                            reason TEXT,
-                            timestamp TEXT
-                        )''')
-        
-        # Создание таблицы для предметов магазина
-        await db.execute('''CREATE TABLE IF NOT EXISTS shop_items (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            name TEXT UNIQUE,
-                            price INTEGER,
-                            description TEXT
-                        )''')
-        
-        # Создание таблицы для инвентаря пользователя
-        await db.execute('''CREATE TABLE IF NOT EXISTS user_inventory (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            user_id INTEGER,
-                            item_id INTEGER,
-                            quantity INTEGER DEFAULT 1,
-                            FOREIGN KEY (item_id) REFERENCES shop_items(id)
-                        )''')
-        
-        # Создание таблицы для пользовательских настроек
-        await db.execute('''CREATE TABLE IF NOT EXISTS user_settings (
-                            user_id INTEGER PRIMARY KEY,
-                            guild_id INTEGER,
-                            notifications_enabled BOOLEAN DEFAULT 1,
-                            private_messages_enabled BOOLEAN DEFAULT 1
-                        )''')
-        
-        # Вставка стандартных предметов магазина
-        default_items = [
-            ("Имперский шлем", 200, "Стандартный шлем штурмовика Империи"),
-            ("Меч джедая", 500, "Оружие выбора Джедая"),
-            ("Маска Дарта Вейдера", 300, "Из intimidating маска Ситхов"),
-            ("Модель истребителя ТА", 400, "Коллекционная модель истребителя ТА"),
-            ("Значок Альянса повстанцев", 150, "Покажите свою поддержку Повстанцам"),
-            ("Монета Имперских кредитов", 100, "Декоративная монета Имперской валюты"),
-            ("Голокрон Ситхов", 1000, "Хранилище знаний Ситхов"),
-            ("Голокрон Джедаев", 1000, "Хранилище знаний Джедаев"),
-            ("Значок Звёздного флота", 250, "Значок с изображением Звёздного флота"),
-            ("Фигурка Эвоков", 120, "Коллекционная фигурка Эвоков")
-        ]
-        
-        for item in default_items:
-            await db.execute("INSERT OR IGNORE INTO shop_items (name, price, description) VALUES (?, ?, ?)", item)
-        
-        await db.commit()
-
-async def get_user_data(user_id, guild_id):
-    """Получение данных пользователя"""
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        async with db.execute("SELECT * FROM users WHERE user_id = ? AND guild_id = ?", (user_id, guild_id)) as cursor:
-            result = await cursor.fetchone()
-            if result:
-                columns = ['user_id', 'guild_id', 'level', 'xp', 'credits', 'rank', 'join_date', 'last_daily_claim', 'warnings']
-                return dict(zip(columns, result))
-            return None
-
-async def create_user(user_id, guild_id):
-    """Создание нового пользователя"""
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        await db.execute("INSERT OR IGNORE INTO users (user_id, guild_id, join_date, warnings) VALUES (?, ?, ?, ?)",
-                         (user_id, guild_id, datetime.now().isoformat(), 0))
-        await db.commit()
-
-async def update_user_xp(user_id, guild_id, xp_amount):
-    """Обновление XP пользователя"""
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        # Получаем текущие XP и уровень
-        async with db.execute("SELECT xp, level FROM users WHERE user_id = ? AND guild_id = ?", (user_id, guild_id)) as cursor:
-            result = await cursor.fetchone()
-        
-        if result:
-            current_xp, current_level = result
-            new_xp = current_xp + xp_amount
-            new_level = (new_xp // 100) + 1
+    async def init_db(self):
+        """Инициализация базы данных"""
+        async with aiosqlite.connect(self.db_path) as db:
+            # Создание таблицы пользователей
+            await db.execute('''
+                CREATE TABLE IF NOT EXISTS users (
+                    id INTEGER PRIMARY KEY,
+                    guild_id INTEGER,
+                    credits INTEGER DEFAULT 0,
+                    level INTEGER DEFAULT 1,
+                    xp INTEGER DEFAULT 0,
+                    rank TEXT DEFAULT 'Новичок',
+                    last_daily TEXT,
+                    last_quest TEXT
+                )
+            ''')
             
-            await db.execute("UPDATE users SET xp = ?, level = ? WHERE user_id = ? AND guild_id = ?",
-                           (new_xp, new_level, user_id, guild_id))
-        else:
-            new_xp = xp_amount
-            new_level = (new_xp // 100) + 1
-            await db.execute("INSERT INTO users (user_id, guild_id, xp, level, join_date, warnings) VALUES (?, ?, ?, ?, ?, ?)",
-                           (user_id, guild_id, new_xp, new_level, datetime.now().isoformat(), 0))
-        
-        await db.commit()
-        return new_level
+            # Создание таблицы предупреждений
+            await db.execute('''
+                CREATE TABLE IF NOT EXISTS warnings (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    guild_id INTEGER,
+                    moderator_id INTEGER,
+                    date TEXT,
+                    reason TEXT
+                )
+            ''')
+            
+            # Создание таблицы магазина
+            await db.execute('''
+                CREATE TABLE IF NOT EXISTS shop (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT UNIQUE,
+                    price INTEGER,
+                    description TEXT
+                )
+            ''')
+            
+            # Создание таблицы инвентаря
+            await db.execute('''
+                CREATE TABLE IF NOT EXISTS inventory (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    item_id INTEGER,
+                    FOREIGN KEY (item_id) REFERENCES shop(id)
+                )
+            ''')
+            
+            # Создание таблицы персонажей
+            await db.execute('''
+                CREATE TABLE IF NOT EXISTS characters (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER UNIQUE,
+                    class TEXT,
+                    strength INTEGER,
+                    agility INTEGER,
+                    intelligence INTEGER
+                )
+            ''')
+            
+            await db.commit()
 
-async def get_top_users(guild_id, limit=10):
-    """Получение топ пользователей по уровню"""
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        async with db.execute("SELECT user_id, level, xp FROM users WHERE guild_id = ? ORDER BY level DESC, xp DESC LIMIT ?", 
-                             (guild_id, limit)) as cursor:
-            return await cursor.fetchall()
+    async def create_user(self, user_id, guild_id):
+        """Создание нового пользователя"""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute('INSERT OR IGNORE INTO users (id, guild_id, credits, level, xp) VALUES (?, ?, 0, 1, 0)', 
+                           (user_id, guild_id))
+            await db.commit()
 
-async def add_warning(user_id, guild_id, moderator_id, reason):
-    """Добавление предупреждения пользователю"""
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        # Обновляем счетчик предупреждений пользователя
-        await db.execute("UPDATE users SET warnings = warnings + 1 WHERE user_id = ? AND guild_id = ?", 
-                        (user_id, guild_id))
-        
-        # Добавляем запись о предупреждении
-        await db.execute("INSERT INTO warnings (user_id, guild_id, moderator_id, reason, timestamp) VALUES (?, ?, ?, ?, ?)",
-                        (user_id, guild_id, moderator_id, reason, datetime.now().isoformat()))
-        
-        # Получаем количество предупреждений
-        async with db.execute("SELECT warnings FROM users WHERE user_id = ? AND guild_id = ?", 
-                             (user_id, guild_id)) as cursor:
-            result = await cursor.fetchone()
-        
-        await db.commit()
-        return result[0] if result else 0
+    async def get_user_data(self, user_id):
+        """Получение данных пользователя"""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute('SELECT * FROM users WHERE id = ?', (user_id,))
+            return await cursor.fetchone()
 
-async def reset_warnings(user_id, guild_id):
-    """Сброс предупреждений пользователя"""
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        await db.execute("UPDATE users SET warnings = 0 WHERE user_id = ? AND guild_id = ?", (user_id, guild_id))
-        await db.commit()
-
-async def add_credits(user_id, guild_id, amount):
-    """Добавление кредитов пользователю"""
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        async with db.execute("SELECT credits FROM users WHERE user_id = ? AND guild_id = ?", (user_id, guild_id)) as cursor:
-            result = await cursor.fetchone()
-        
-        if result:
-            current_credits = result[0]
-            new_credits = current_credits + amount
-            await db.execute("UPDATE users SET credits = ? WHERE user_id = ? AND guild_id = ?", 
-                           (new_credits, user_id, guild_id))
-        else:
-            new_credits = amount
-            await db.execute("INSERT INTO users (user_id, guild_id, credits, join_date, warnings) VALUES (?, ?, ?, ?, ?)",
-                           (user_id, guild_id, new_credits, datetime.now().isoformat(), 0))
-        
-        await db.commit()
-        return new_credits
-
-async def get_user_credits(user_id, guild_id):
-    """Получение количества кредитов пользователя"""
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        async with db.execute("SELECT credits FROM users WHERE user_id = ? AND guild_id = ?", (user_id, guild_id)) as cursor:
+    async def get_balance(self, user_id):
+        """Получение баланса пользователя"""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute('SELECT credits FROM users WHERE id = ?', (user_id,))
             result = await cursor.fetchone()
             return result[0] if result else 0
 
-async def get_shop_items():
-    """Получение всех предметов магазина"""
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        async with db.execute("SELECT id, name, price, description FROM shop_items") as cursor:
+    async def add_credits(self, user_id, amount):
+        """Добавление/удаление кредитов у пользователя"""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute('UPDATE users SET credits = credits + ? WHERE id = ?', (amount, user_id))
+            await db.commit()
+
+    async def get_user_level(self, user_id):
+        """Получение уровня пользователя"""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute('SELECT level FROM users WHERE id = ?', (user_id,))
+            result = await cursor.fetchone()
+            return result[0] if result else 1
+
+    async def add_xp(self, user_id, xp_amount):
+        """Добавление опыта пользователю"""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute('UPDATE users SET xp = xp + ? WHERE id = ?', (xp_amount, user_id))
+            await db.commit()
+
+    async def level_up(self, user_id):
+        """Повышение уровня пользователя"""
+        async with aiosqlite.connect(self.db_path) as db:
+            # Получаем текущий уровень и опыт
+            cursor = await db.execute('SELECT level, xp FROM users WHERE id = ?', (user_id,))
+            result = await cursor.fetchone()
+            
+            if result:
+                current_level, current_xp = result
+                xp_needed = int((current_level + 1) ** 2 * 10)
+                
+                # Обновляем уровень и сбрасываем XP сверх нужного
+                new_level = current_level + 1
+                remaining_xp = current_xp - xp_needed
+                
+                await db.execute('UPDATE users SET level = ?, xp = ? WHERE id = ?', 
+                               (new_level, remaining_xp, user_id))
+                await db.commit()
+
+    async def get_top_users(self):
+        """Получение топ пользователей по уровню"""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute('SELECT id, guild_id, level, xp FROM users ORDER BY level DESC, xp DESC LIMIT 10')
             return await cursor.fetchall()
 
-async def buy_item(user_id, item_id):
-    """Покупка предмета пользователем"""
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        # Получаем цену предмета
-        async with db.execute("SELECT price FROM shop_items WHERE id = ?", (item_id,)) as cursor:
-            result = await cursor.fetchone()
-        
-        if not result:
-            return False, "Предмет не найден"
-        
-        price = result[0]
-        
-        # Проверяем, достаточно ли кредитов у пользователя
-        async with db.execute("SELECT credits FROM users WHERE user_id = ?", (user_id,)) as cursor:
-            result = await cursor.fetchone()
-        
-        if not result or result[0] < price:
-            return False, "Недостаточно кредитов"
-        
-        # Списываем кредиты
-        await db.execute("UPDATE users SET credits = credits - ? WHERE user_id = ?", (price, user_id))
-        
-        # Добавляем предмет в инвентарь
-        await db.execute("INSERT INTO user_inventory (user_id, item_id, quantity) VALUES (?, ?, 1)", (user_id, item_id))
-        
-        await db.commit()
-        return True, f"Покупка успешно завершена! Списано {price} кредитов."
+    async def add_warning(self, user_id, guild_id, moderator_id, reason):
+        """Добавление предупреждения пользователю"""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute('INSERT INTO warnings (user_id, guild_id, moderator_id, date, reason) VALUES (?, ?, ?, ?, ?)',
+                           (user_id, guild_id, moderator_id, datetime.now().isoformat(), reason))
+            await db.commit()
 
-async def get_user_inventory(user_id):
-    """Получение инвентаря пользователя"""
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        async with db.execute("""
-            SELECT si.name, ui.quantity 
-            FROM user_inventory ui
-            JOIN shop_items si ON ui.item_id = si.id
-            WHERE ui.user_id = ?
-        """, (user_id,)) as cursor:
+    async def get_warnings(self, user_id, guild_id):
+        """Получение предупреждений пользователя"""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute('SELECT * FROM warnings WHERE user_id = ? AND guild_id = ?', (user_id, guild_id))
             return await cursor.fetchall()
 
-async def get_guild_config(guild_id):
-    """Получение конфигурации сервера"""
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        async with db.execute("SELECT * FROM guilds WHERE guild_id = ?", (guild_id,)) as cursor:
+    async def clear_warnings(self, user_id, guild_id):
+        """Очистка предупреждений пользователя"""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute('DELETE FROM warnings WHERE user_id = ? AND guild_id = ?', (user_id, guild_id))
+            await db.commit()
+
+    async def get_last_daily(self, user_id):
+        """Получение времени последней ежедневной награды"""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute('SELECT last_daily FROM users WHERE id = ?', (user_id,))
+            result = await cursor.fetchone()
+            return result[0] if result else None
+
+    async def set_last_daily(self, user_id):
+        """Установка времени последней ежедневной награды"""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute('UPDATE users SET last_daily = ? WHERE id = ?', (datetime.now().isoformat(), user_id))
+            await db.commit()
+
+    async def get_last_quest(self, user_id):
+        """Получение времени последнего задания"""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute('SELECT last_quest FROM users WHERE id = ?', (user_id,))
+            result = await cursor.fetchone()
+            return result[0] if result else None
+
+    async def set_last_quest(self, user_id):
+        """Установка времени последнего задания"""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute('UPDATE users SET last_quest = ? WHERE id = ?', (datetime.now().isoformat(), user_id))
+            await db.commit()
+
+    async def get_shop_items(self):
+        """Получение всех товаров в магазине"""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute('SELECT * FROM shop')
+            return await cursor.fetchall()
+
+    async def add_item_to_shop(self, name, price, description):
+        """Добавление товара в магазин"""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute('INSERT OR IGNORE INTO shop (name, price, description) VALUES (?, ?, ?)',
+                           (name, price, description))
+            await db.commit()
+
+    async def get_item_by_name(self, name):
+        """Получение товара по имени"""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute('SELECT * FROM shop WHERE name = ?', (name,))
+            return await cursor.fetchone()
+
+    async def get_item_by_id(self, item_id):
+        """Получение товара по ID"""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute('SELECT * FROM shop WHERE id = ?', (item_id,))
+            return await cursor.fetchone()
+
+    async def add_item_to_inventory(self, user_id, item_id):
+        """Добавление товара в инвентарь пользователя"""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute('INSERT INTO inventory (user_id, item_id) VALUES (?, ?)', (user_id, item_id))
+            await db.commit()
+
+    async def get_inventory(self, user_id):
+        """Получение инвентаря пользователя"""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute('SELECT * FROM inventory WHERE user_id = ?', (user_id,))
+            return await cursor.fetchall()
+
+    async def remove_item_from_inventory(self, user_id, item_id):
+        """Удаление товара из инвентаря пользователя"""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute('SELECT id FROM inventory WHERE user_id = ? AND item_id = ? LIMIT 1', (user_id, item_id))
             result = await cursor.fetchone()
             if result:
-                columns = ['guild_id', 'admin_role_id', 'mod_role_id', 'mute_role_id', 'log_channel_id', 'autorank_enabled', 'economy_enabled']
-                return dict(zip(columns, result))
-            return None
+                await db.execute('DELETE FROM inventory WHERE id = ?', (result[0],))
+                await db.commit()
 
-async def update_guild_config(guild_id, **kwargs):
-    """Обновление конфигурации сервера"""
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        # Формируем SQL запрос динамически
-        set_clause = ", ".join([f"{key} = ?" for key in kwargs.keys()])
-        values = list(kwargs.values()) + [guild_id]
-        
-        await db.execute(f"INSERT OR REPLACE INTO guilds (guild_id, {', '.join(kwargs.keys())}) VALUES (?{', ?' * len(kwargs)})", values)
-        await db.commit()
+    async def set_user_rank(self, user_id, rank):
+        """Установка ранга пользователю"""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute('UPDATE users SET rank = ? WHERE id = ?', (rank, user_id))
+            await db.commit()
 
-async def setup(bot):
-    """Функция setup для загрузки модуля"""
-    pass
+    async def get_user_rank(self, user_id):
+        """Получение ранга пользователя"""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute('SELECT rank FROM users WHERE id = ?', (user_id,))
+            result = await cursor.fetchone()
+            return result[0] if result else None
+
+    async def create_character(self, user_id, char_class, strength, agility, intelligence):
+        """Создание персонажа для пользователя"""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute('''INSERT OR REPLACE INTO characters 
+                              (user_id, class, strength, agility, intelligence) 
+                              VALUES (?, ?, ?, ?, ?)''',
+                           (user_id, char_class, strength, agility, intelligence))
+            await db.commit()
+
+    async def get_character(self, user_id):
+        """Получение персонажа пользователя"""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute('SELECT * FROM characters WHERE user_id = ?', (user_id,))
+            return await cursor.fetchone()
+
+    def is_supreme_ruler(self, user_id):
+        """Проверка, является ли пользователь верховным правителем"""
+        try:
+            with open('config.json', 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            supreme_ruler_id = config['government_structure']['supreme_ruler']
+            return str(user_id) == supreme_ruler_id
+        except:
+            return False

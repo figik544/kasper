@@ -1,15 +1,13 @@
 services:
 - type: web
-  name: galactic-empire-bot
-  env: docker
-  region: frankfurt  # или любой другой регион на твой выбор
+  name: kasper-bot
+  env: python
+  region: frankfurt
   plan: free
-  branch: main
-  healthCheckPath: /
+  buildCommand: pip install -r requirements.txt
+  startCommand: python main.py
   envVars:
-  - key: PYTHON_VERSION
-    value: 3.9
   - key: DISCORD_BOT_TOKEN
-    sync: false  # будет установлено вручную в интерфейсе Render
-  - key: DATABASE_URL
-    sync: false  # будет установлено вручную в интерфейсе Render
+    sync: false
+  healthCheckPath: /
+  healthCheckMaxRetries: 3

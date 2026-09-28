@@ -1,248 +1,323 @@
 import discord
 from discord.ext import commands
-import asyncio
+from discord import app_commands
 import random
+import math
 from datetime import datetime
-import aiosqlite
 import json
 
-from .database import update_user_xp, get_top_users, get_user_data, create_user
-
-# Загрузка конфигурации
-with open('config.json', 'r', encoding='utf-8') as f:
-    config = json.load(f)
-
-# Тематические ранги Звёздных войн
-STAR_WARS_RANKS = {
-    1: {"name": "Рекрут", "role_color": 0xCCCCCC, "perm_desc": "Базовый член"},
-    5: {"name": "Штурмовик", "role_color": 0xCCCCCC, "perm_desc": "Базовый солдат"},
-    10: {"name": "Лейтенант", "role_color": 0x888888, "perm_desc": "Младший офицер"},
-    15: {"name": "Капитан", "role_color": 0x777777, "perm_desc": "Офицер роты"},
-    20: {"name": "Майор", "role_color": 0x666666, "perm_desc": "Офицер полевого уровня"},
-    30: {"name": "Полковник", "role_color": 0x555555, "perm_desc": "Старший офицер полевого уровня"},
-    40: {"name": "Генерал", "role_color": 0x444444, "perm_desc": "Высокопоставленный офицер"},
-    50: {"name": "Адмирал", "role_color": 0x333333, "perm_desc": "Офицер флота"},
-    60: {"name": "Тёмный Лорд", "role_color": 0x222222, "perm_desc": "Мощный пользователь темной стороны"},
-    70: {"name": "Император", "role_color": 0x111111, "perm_desc": "Верховный правитель Империи"}
-}
-
-class LevelsCog(commands.Cog, name="Уровни"):
-    def __init__(self, bot):
+class LevelsCog(commands.Cog):
+    def __init__(self, bot, db):
         self.bot = bot
+        self.db = db
 
-    @commands.Cog.listener()
-    async def on_message(self, message):
-        if message.author.bot:
-            return
-
-        # Добавляем XP за сообщения
-        xp_amount = random.randint(config['xp_rewards']['message_range_min'], config['xp_rewards']['message_range_max'])
-        
-        # Создаем пользователя, если его нет
-        await create_user(message.author.id, message.guild.id)
-        
-        new_level = await update_user_xp(message.author.id, message.guild.id, xp_amount)
-        
-        # Проверяем, нужно ли обновить роль пользователя
-        await self.update_user_rank(message.author, new_level, message.guild)
-
-    async def update_user_rank(self, user, new_level, guild):
-        """Обновление роли пользователя при повышении уровня"""
-        if new_level in STAR_WARS_RANKS:
-            rank_info = STAR_WARS_RANKS[new_level]
-
-            # Создаем или получаем роль
-            existing_role = discord.utils.get(guild.roles, name=rank_info["name"])
-            if not existing_role:
-                role = await guild.create_role(
-                    name=rank_info["name"],
-                    color=discord.Color(rank_info["role_color"]),
-                    reason="Повышение уровня"
-                )
-            else:
-                role = existing_role
-
-            # Добавляем роль пользователю
-            await user.add_roles(role)
-
-            # Удаляем предыдущие роли ранга, если они есть
-            for level_check, info in STAR_WARS_RANKS.items():
-                if level_check < new_level and level_check != new_level:
-                    old_role = discord.utils.get(guild.roles, name=info["name"])
-                    if old_role and old_role in user.roles:
-                        await user.remove_roles(old_role)
-
-            # Отправляем сообщение о повышении
-            embed = discord.Embed(
-                title="Повышение!",
-                description=f"{user.mention}, ваша преданность была отмечена. Вы были произведены в {rank_info['name']}!",
-                color=rank_info["role_color"]
-            )
-            # Пытаемся найти системный канал для отправки сообщения
-            system_channel = guild.system_channel or guild.text_channels[0]
-            await system_channel.send(embed=embed)
-
-    @commands.command(name='profile')
+    @commands.hybrid_command(name='profile', description='Показывает профиль пользователя с его статистикой')
+    @app_commands.describe(member='Пользователь для просмотра профиля')
     async def profile(self, ctx, member: discord.Member = None):
         """Показывает профиль пользователя с его статистикой"""
-        if member is None:
+        if not member:
             member = ctx.author
-
-        user_data = await get_user_data(member.id, ctx.guild.id)
         
+        # Загружаем конфиг для проверки, является ли пользователь верховным правителем
+        with open('config.json', 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        supreme_ruler_id = config['government_structure']['supreme_ruler']
+        is_supreme_ruler = member.id == int(supreme_ruler_id)
+        
+        user_data = await self.db.get_user_data(member.id)
         if not user_data:
-            await create_user(member.id, ctx.guild.id)
-            user_data = await get_user_data(member.id, ctx.guild.id)
-
-        if not user_data:
-            embed = discord.Embed(
-                title="Профиль не найден",
-                description=f"У {member.mention} нет профиля. Активность на сервере создаст профиль.",
-                color=0xFF0000
-            )
-            await ctx.send(embed=embed)
-            return
-
-        # Рассчитываем прогресс до следующего уровня
-        xp_to_next = ((user_data['level'] * 100) - user_data['xp']) % 100
-        if xp_to_next == 0:
-            xp_to_next = 100
-
+            await self.db.create_user(member.id, member.guild.id)
+            user_data = await self.db.get_user_data(member.id)
+        
+        level = user_data[3]
+        xp = user_data[4]
+        xp_needed = int((level + 1) ** 2 * 10)
+        balance = await self.db.get_balance(member.id)
+        
+        # Получаем текущую роль пользователя
+        current_rank = await self.db.get_user_rank(member.id)
+        
         embed = discord.Embed(
-            title=f"Профиль: {member.display_name}",
-            color=0x0000FF
+            title=f"👤 Профиль {member.display_name}",
+            color=0x00FFFF
         )
-        embed.set_thumbnail(url=member.display_avatar.url)
-        embed.add_field(name="Уровень", value=user_data['level'], inline=True)
-        embed.add_field(name="XP", value=f"{user_data['xp']}/{user_data['level'] * 100}", inline=True)
-        embed.add_field(name="Кредиты", value=user_data['credits'], inline=True)
-        embed.add_field(name="Ранг", value=user_data['rank'], inline=True)
-        embed.add_field(name="Предупреждения", value=user_data['warnings'], inline=True)
-        embed.add_field(name="XP до следующего уровня", value=xp_to_next, inline=True)
+        embed.set_thumbnail(url=member.avatar.url if member.avatar else member.default_avatar.url)
+        embed.add_field(name="Уровень", value=level, inline=True)
+        embed.add_field(name="Опыт", value=f"{xp}/{xp_needed}", inline=True)
+        embed.add_field(name="Кредиты", value=balance, inline=True)
+        embed.add_field(name="Ранг", value=current_rank if current_rank else "Новичок", inline=False)
+        embed.add_field(name="Присоединился", value=member.joined_at.strftime("%d.%m.%Y"), inline=True)
+        embed.add_field(name="Аккаунт создан", value=member.created_at.strftime("%d.%m.%Y"), inline=True)
         
-        if user_data['join_date']:
-            join_date = datetime.fromisoformat(user_data['join_date'].replace('Z', '+00:00'))
-            embed.add_field(name="Дата присоединения", value=join_date.strftime("%Y-%m-%d"), inline=True)
-
+        # Если пользователь - верховный правитель, добавляем специальное поле
+        if is_supreme_ruler:
+            embed.add_field(name="Статус", value="👑 Верховный Правитель Федерации Галактической Империи", inline=False)
+            embed.color = 0xFFFF00  # Жёлтый цвет для верховного правителя
+        
         await ctx.send(embed=embed)
 
-    @commands.command(name='leaderboard')
+    @commands.hybrid_command(name='leaderboard', description='Показывает топ игроков по уровню')
     async def leaderboard(self, ctx):
         """Показывает топ игроков по уровню"""
-        top_users = await get_top_users(ctx.guild.id, 10)
-
+        top_users = await self.db.get_top_users()
+        
+        if not top_users:
+            await ctx.send("📊 Список лидеров пуст!")
+            return
+        
         embed = discord.Embed(
-            title="Лидерборд Галактической Империи",
-            description="Топ Имперских офицеров по рангу",
-            color=0x000000
+            title="🏆 Таблица Лидеров",
+            description="Топ игроков по уровню:",
+            color=0xFFD700
         )
-
-        for i, (user_id, level, xp) in enumerate(top_users, 1):
+        
+        for i, user_data in enumerate(top_users[:10], 1):
+            user_id, guild_id, user_level, user_xp = user_data
             user = self.bot.get_user(user_id)
             if user:
+                # Проверяем, является ли пользователь верховным правителем
+                with open('config.json', 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                
+                supreme_ruler_id = config['government_structure']['supreme_ruler']
+                is_supreme_ruler = user_id == int(supreme_ruler_id)
+                
+                rank_display = f"{i}. {user.display_name}"
+                if is_supreme_ruler:
+                    rank_display = f"👑 {rank_display}"
+                
                 embed.add_field(
-                    name=f"#{i}: {user.display_name}",
-                    value=f"Уровень {level} (XP: {xp})",
+                    name=rank_display,
+                    value=f"Уровень: {user_level}, Опыт: {user_xp}",
                     inline=False
                 )
-            else:
-                embed.add_field(
-                    name=f"#{i}: Неизвестный пользователь (ID: {user_id})",
-                    value=f"Уровень {level} (XP: {xp})",
-                    inline=False
-                )
-
+        
         await ctx.send(embed=embed)
 
-    @commands.command(name='rankup')
+    @commands.hybrid_command(name='rankup', description='Попытка получить более высокий ранг через испытания')
     async def rankup(self, ctx):
         """Попытка получить более высокий ранг через испытания"""
-        user_data = await get_user_data(ctx.author.id, ctx.guild.id)
+        # Загружаем конфиг для проверки, является ли пользователь верховным правителем
+        with open('config.json', 'r', encoding='utf-8') as f:
+            config = json.load(f)
         
+        supreme_ruler_id = config['government_structure']['supreme_ruler']
+        is_supreme_ruler = ctx.author.id == int(supreme_ruler_id)
+        
+        user_data = await self.db.get_user_data(ctx.author.id)
         if not user_data:
-            embed = discord.Embed(
-                title="Невозможно повысить ранг",
-                description="Вы должны больше участвовать, чтобы получить опыт.",
-                color=0xFF0000
-            )
-            await ctx.send(embed=embed)
-            return
-
-        level, xp, credits = user_data['level'], user_data['xp'], user_data['credits']
+            await self.db.create_user(ctx.author.id, ctx.guild.id)
+            user_data = await self.db.get_user_data(ctx.author.id)
         
-        # Стоимость повышения увеличивается с уровнем
-        cost = level * 50
+        current_level = user_data[3]
+        current_rank = await self.db.get_user_rank(ctx.author.id)
         
-        if credits < cost:
-            embed = discord.Embed(
-                title="Недостаточно средств",
-                description=f"Вам нужно {cost} кредитов для попытки повышения, но у вас только {credits}.",
-                color=0xFF0000
-            )
-            await ctx.send(embed=embed)
-            return
-
-        # Списываем стоимость
-        await add_credits(ctx.author.id, ctx.guild.id, -cost)
-        
-        # Шанс успеха зависит от уровня
-        success_chance = min(70 + level, 95)  # Шанс увеличивается с уровнем, максимум 95%
-        
-        if random.randint(1, 100) <= success_chance:
-            # Добавляем XP за успешное повышение
-            xp_gain = random.randint(50, 100)
-            new_level = await update_user_xp(ctx.author.id, ctx.guild.id, xp_gain)
+        # Если пользователь - верховный правитель, он всегда может повышаться
+        if is_supreme_ruler:
+            # Определяем следующий возможный ранг
+            rank_order = [
+                "Новичок", "Рекрут", "Штурмовик", "Офицер", "Капитан", 
+                "Майор", "Подполковник", "Полковник", "Генерал", "Маршал", "Император"
+            ]
+            
+            if not current_rank or current_rank not in rank_order:
+                next_rank = "Рекрут"
+            else:
+                current_index = rank_order.index(current_rank)
+                if current_index < len(rank_order) - 1:
+                    next_rank = rank_order[current_index + 1]
+                else:
+                    await ctx.send("🎉 Вы достигли максимального ранга!")
+                    return
+            
+            await self.db.set_user_rank(ctx.author.id, next_rank)
             
             embed = discord.Embed(
-                title="Повышение успешно!",
-                description=f"Ваша преданность была отмечена! Вы получили {xp_gain} XP.",
+                title="🎖️ Повышение!",
+                description=f"@{ctx.author.display_name}, как Верховный Правитель, вы были произведены в {next_rank}!",
                 color=0x00FF00
             )
-        else:
-            embed = discord.Embed(
-                title="Повышение не удалось",
-                description="Ваша попытка подняться в ранге была безуспешной. Продолжайте доказывать свою преданность.",
-                color=0xFFA500
+            await ctx.send(embed=embed)
+            
+            # Награда за повышение
+            reward = random.randint(100, 300)
+            await self.db.add_credits(ctx.author.id, reward)
+            
+            reward_embed = discord.Embed(
+                title="💰 Награда за повышение",
+                description=f"Вы получили {reward} кредитов за продвижение до {next_rank}!",
+                color=0x00FF00
             )
+            await ctx.send(embed=reward_embed)
+            return
         
-        await ctx.send(embed=embed)
-
-    @commands.command(name='setrank')
-    @commands.has_permissions(administrator=True)
-    async def set_rank(self, ctx, member: discord.Member, *, rank_name):
-        """Ручная установка ранга пользователю (только для администраторов)"""
-        # Находим роль по имени
-        role = discord.utils.get(ctx.guild.roles, name=rank_name)
-        if not role:
+        # Определяем следующий возможный ранг
+        rank_order = [
+            "Новичок", "Рекрут", "Штурмовик", "Офицер", "Капитан", 
+            "Майор", "Подполковник", "Полковник", "Генерал", "Маршал", "Император"
+        ]
+        
+        if not current_rank or current_rank not in rank_order:
+            next_rank = "Рекрут"
+        else:
+            current_index = rank_order.index(current_rank)
+            if current_index < len(rank_order) - 1:
+                next_rank = rank_order[current_index + 1]
+            else:
+                await ctx.send("🎉 Вы достигли максимального ранга!")
+                return
+        
+        # Проверяем, достаточно ли уровня для повышения
+        required_level = rank_order.index(next_rank) * 5  # каждые 5 уровней - новый ранг
+        
+        if current_level >= required_level:
+            await self.db.set_user_rank(ctx.author.id, next_rank)
+            
             embed = discord.Embed(
-                title="Ранг не найден",
-                description=f"Ранг '{rank_name}' не существует на этом сервере.",
-                color=0xFF0000
+                title="🎖️ Повышение!",
+                description=f"@{ctx.author.display_name}, ваша преданность была отмечена. Вы были произведены в {next_rank}!",
+                color=0x00FF00
             )
             await ctx.send(embed=embed)
+            
+            # Награда за повышение
+            reward = random.randint(100, 300)
+            await self.db.add_credits(ctx.author.id, reward)
+            
+            reward_embed = discord.Embed(
+                title="💰 Награда за повышение",
+                description=f"Вы получили {reward} кредитов за продвижение до {next_rank}!",
+                color=0x00FF00
+            )
+            await ctx.send(embed=reward_embed)
+        else:
+            required_xp = required_level * 20  # примерный расчет
+            current_xp = user_data[4]
+            
+            embed = discord.Embed(
+                title="⏳ Повышение",
+                description=f"Для получения ранга {next_rank} требуется уровень {required_level}.\n"
+                           f"Ваш текущий уровень: {current_level}\n"
+                           f"Необходимо опыта: {required_xp - current_xp}",
+                color=0xFFA500
+            )
+            await ctx.send(embed=embed)
+
+    @commands.hybrid_command(name='setrank', description='Ручная установка ранга пользователю (только для администраторов)')
+    @app_commands.describe(member='Пользователь для установки ранга', rank_name='Название ранга')
+    @commands.has_permissions(administrator=True)
+    async def setrank(self, ctx, member: discord.Member, rank_name: str):
+        """Ручная установка ранга пользователю (только для администраторов)"""
+        # Загружаем конфиг для проверки, является ли пользователь верховным правителем
+        with open('config.json', 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        supreme_ruler_id = config['government_structure']['supreme_ruler']
+        is_supreme_ruler = ctx.author.id == int(supreme_ruler_id)
+        
+        # Если пользователь - верховный правитель, он может устанавливать ранги
+        if not (ctx.author.guild_permissions.administrator or is_supreme_ruler):
+            await ctx.send("❌ У вас нет прав для выполнения этой команды!")
             return
-
-        # Удаляем все роли рангов сначала
-        for r in ctx.guild.roles:
-            if r.name in [info["name"] for level, info in STAR_WARS_RANKS.items()]:
-                if r in member.roles:
-                    await member.remove_roles(r)
-
-        # Добавляем новый ранг
-        await member.add_roles(role)
-
-        # Обновляем ранг пользователя в БД
-        async with aiosqlite.connect('galactic_empire_bot.db') as db:
-            await db.execute("UPDATE users SET rank = ? WHERE user_id = ? AND guild_id = ?",
-                           (rank_name, member.id, ctx.guild.id))
-            await db.commit()
-
+        
+        await self.db.set_user_rank(member.id, rank_name)
+        
         embed = discord.Embed(
-            title="Ранг назначен",
-            description=f"{member.mention} получил назначение на ранг {rank_name}",
+            title="⚙️ Установка ранга",
+            description=f"{ctx.author.mention} установил ранг '{rank_name}' пользователю {member.mention}",
             color=0x00FF00
         )
         await ctx.send(embed=embed)
 
+    @commands.Cog.listener()
+    async def on_message(self, message):
+        """Обработка получения опыта за сообщения"""
+        if message.author.bot:
+            return
+        
+        if message.guild is None:  # не в приватных сообщениях
+            return
+        
+        # Загружаем конфиг для проверки, является ли пользователь верховным правителем
+        with open('config.json', 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        supreme_ruler_id = config['government_structure']['supreme_ruler']
+        is_supreme_ruler = message.author.id == int(supreme_ruler_id)
+        
+        # Проверяем, есть ли пользователь в базе
+        user_data = await self.db.get_user_data(message.author.id)
+        if not user_data:
+            await self.db.create_user(message.author.id, message.guild.id)
+        
+        # Добавляем опыт за сообщение
+        base_xp = random.randint(
+            self.bot.config.get('xp_rewards', {}).get('message_range_min', 15),
+            self.bot.config.get('xp_rewards', {}).get('message_range_max', 25)
+        )
+        
+        # Если пользователь - верховный правитель, он получает бонус к опыту
+        xp_gain = base_xp * 2 if is_supreme_ruler else base_xp
+        
+        await self.db.add_xp(message.author.id, xp_gain)
+        
+        # Проверяем, повысился ли уровень
+        user_data = await self.db.get_user_data(message.author.id)
+        level = user_data[3]
+        xp = user_data[4]
+        
+        xp_needed = int((level + 1) ** 2 * 10)
+        
+        if xp >= xp_needed:
+            # Повышение уровня
+            await self.db.level_up(message.author.id)
+            
+            # Уведомление о повышении уровня
+            new_level_data = await self.db.get_user_data(message.author.id)
+            new_level = new_level_data[3]
+            
+            embed = discord.Embed(
+                title="📈 Повышение уровня!",
+                description=f"{message.author.mention}, поздравляем! Вы достигли уровня {new_level}!",
+                color=0x00FF00
+            )
+            
+            # Если пользователь - верховный правитель, добавляем специальное сообщение
+            if is_supreme_ruler:
+                embed.add_field(
+                    name="Специальная награда",
+                    value="Как Верховный Правитель, вы получаете двойной опыт!",
+                    inline=False
+                )
+            
+            # Проверяем, нужно ли обновить роль
+            if self.bot.config.get('autorank_enabled', True):
+                rank_order = [
+                    "Новичок", "Рекрут", "Штурмовик", "Офицер", "Капитан", 
+                    "Майор", "Подполковник", "Полковник", "Генерал", "Маршал", "Император"
+                ]
+                
+                current_rank = await self.db.get_user_rank(message.author.id)
+                if not current_rank:
+                    current_rank = "Новичок"
+                
+                if current_rank != "Император":  # не повышаем выше максимального ранга
+                    current_index = rank_order.index(current_rank) if current_rank in rank_order else 0
+                    target_index = min(len(rank_order) - 1, new_level // 5)  # каждые 5 уровней - новый ранг
+                    
+                    if target_index > current_index:
+                        new_rank = rank_order[target_index]
+                        await self.db.set_user_rank(message.author.id, new_rank)
+                        
+                        embed.add_field(
+                            name="🎖️ Новый ранг",
+                            value=f"Вы были произведены в звание: {new_rank}",
+                            inline=False
+                        )
+            
+            await message.channel.send(embed=embed)
+
 async def setup(bot):
-    await bot.add_cog(LevelsCog(bot))
+    db = bot.db  # используем общую базу данных
+    await bot.add_cog(LevelsCog(bot, db))

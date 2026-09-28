@@ -1,209 +1,419 @@
 import discord
 from discord.ext import commands
-import asyncio
+from discord import app_commands
 import random
-from datetime import datetime
-import aiosqlite
 import json
+from datetime import datetime, timedelta
 
-from .database import add_credits, get_user_credits, get_shop_items, buy_item, get_user_inventory
-
-# Загрузка конфигурации
-with open('config.json', 'r', encoding='utf-8') as f:
-    config = json.load(f)
-
-class EconomyCog(commands.Cog, name="Экономика"):
-    def __init__(self, bot):
+class EconomyCog(commands.Cog):
+    def __init__(self, bot, db):
         self.bot = bot
+        self.db = db
 
-    @commands.command(name='balance')
+    @commands.hybrid_command(name='balance', description='Проверка баланса кредитов')
+    @app_commands.describe(member='Пользователь для проверки баланса')
     async def balance(self, ctx, member: discord.Member = None):
         """Проверка баланса кредитов"""
-        if member is None:
+        if not member:
             member = ctx.author
-
-        credits = await get_user_credits(member.id, ctx.guild.id)
-
+        
+        # Загружаем конфиг для проверки, является ли пользователь верховным правителем
+        with open('config.json', 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        supreme_ruler_id = config['government_structure']['supreme_ruler']
+        is_supreme_ruler = member.id == int(supreme_ruler_id)
+        
+        balance = await self.db.get_balance(member.id)
+        
         embed = discord.Embed(
-            title="Баланс кредитов",
-            description=f"{member.display_name} имеет {credits} кредитов",
-            color=0x00FFFF
-        )
-        await ctx.send(embed=embed)
-
-    @commands.command(name='daily')
-    async def daily_reward(self, ctx):
-        """Ежедневная награда"""
-        async with aiosqlite.connect('galactic_empire_bot.db') as db:
-            async with db.execute("SELECT last_daily_claim FROM users WHERE user_id = ? AND guild_id = ?", 
-                                 (ctx.author.id, ctx.guild.id)) as cursor:
-                result = await cursor.fetchone()
-
-        now = datetime.now()
-        if result and result[0]:
-            try:
-                last_claim = datetime.fromisoformat(result[0])
-                if (now - last_claim).days < 1:
-                    hours_left = 24 - (now - last_claim).seconds // 3600
-                    embed = discord.Embed(
-                        title="Ежедневная награда",
-                        description=f"Вы уже получили ежедневную награду. Попробуйте снова через {hours_left} часов.",
-                        color=0xFF0000
-                    )
-                    await ctx.send(embed=embed)
-                    return
-            except ValueError:
-                # Если формат даты неверный, продолжаем
-                pass
-
-        # Выдаем ежедневную награду
-        reward = random.randint(config['daily_rewards']['min_credits'], config['daily_rewards']['max_credits'])
-        new_balance = await add_credits(ctx.author.id, ctx.guild.id, reward)
-
-        embed = discord.Embed(
-            title="Ежедневная награда получена",
-            description=f"Вы получили {reward} кредитов в качестве ежедневной лояльности!",
+            title=f"💰 Баланс {member.display_name}",
+            description=f"Кредитов: {balance}",
             color=0x00FF00
         )
-        await ctx.send(embed=embed)
-
-    @commands.command(name='givecredits')
-    @commands.has_permissions(administrator=True)
-    async def give_credits(self, ctx, member: discord.Member, amount: int):
-        """Выдача кредитов пользователю (только для администраторов)"""
-        new_balance = await add_credits(member.id, ctx.guild.id, amount)
-
-        embed = discord.Embed(
-            title="Кредиты выданы",
-            description=f"{amount} кредитов выдано пользователю {member.mention}. Новый баланс: {new_balance}",
-            color=0x00FF00
-        )
-        await ctx.send(embed=embed)
-
-    @commands.command(name='shop')
-    async def shop(self, ctx):
-        """Отображение имперского рынка"""
-        items = await get_shop_items()
-
-        embed = discord.Embed(
-            title=" имперский рынок",
-            description="Предметы, доступные для покупки за Имперские кредиты",
-            color=0x8B0000
-        )
-
-        for item_id, name, price, desc in items:
+        
+        # Если пользователь - верховный правитель, добавляем специальное сообщение
+        if is_supreme_ruler:
             embed.add_field(
-                name=f"{name} - {price} кредитов",
-                value=desc,
+                name="Статус",
+                value="👑 Верховный Правитель Федерации Галактической Империи",
                 inline=False
             )
-
+        
         await ctx.send(embed=embed)
 
-    @commands.command(name='buy')
-    async def buy_item_cmd(self, ctx, *, item_name):
-        """Покупка предмета из магазина"""
-        # Получаем все предметы из магазина
-        items = await get_shop_items()
+    @commands.hybrid_command(name='daily', description='Ежедневная награда')
+    async def daily(self, ctx):
+        """Ежедневная награда"""
+        # Загружаем конфиг для проверки, является ли пользователь верховным правителем
+        with open('config.json', 'r', encoding='utf-8') as f:
+            config = json.load(f)
         
-        # Находим совпадающий предмет
-        target_item = None
-        for item_id, name, price, desc in items:
-            if item_name.lower() in name.lower():
-                target_item = (item_id, name, price)
-                break
+        supreme_ruler_id = config['government_structure']['supreme_ruler']
+        is_supreme_ruler = ctx.author.id == int(supreme_ruler_id)
         
-        if not target_item:
+        user_id = ctx.author.id
+        last_daily = await self.db.get_last_daily(user_id)
+        
+        if last_daily:
+            last_daily_time = datetime.fromisoformat(last_daily)
+            time_diff = datetime.now() - last_daily_time
+            
+            if time_diff.days < 1:
+                remaining_time = timedelta(days=1) - time_diff
+                hours, remainder = divmod(remaining_time.seconds, 3600)
+                minutes, _ = divmod(remainder, 60)
+                
+                embed = discord.Embed(
+                    title="⏳ Ежедневная награда",
+                    description=f"Вы уже получали ежедневную награду!\nСледующая награда через: {hours}ч {minutes}м",
+                    color=0xFFA500
+                )
+                await ctx.send(embed=embed)
+                return
+        
+        # Награда за ежедневный вход
+        min_credits = self.bot.config.get('daily_rewards', {}).get('min_credits', 50)
+        max_credits = self.bot.config.get('daily_rewards', {}).get('max_credits', 150)
+        reward = random.randint(min_credits, max_credits)
+        
+        # Если пользователь - верховный правитель, он получает бонус к награде
+        if is_supreme_ruler:
+            reward = int(reward * 2)  # Двойная награда для верховного правителя
+        
+        await self.db.add_credits(user_id, reward)
+        await self.db.set_last_daily(user_id)
+        
+        embed = discord.Embed(
+            title="🎁 Ежедневная награда",
+            description=f"Вы получили {reward} кредитов!" + (" (Бонус для Верховного Правителя!)" if is_supreme_ruler else ""),
+            color=0x00FF00
+        )
+        await ctx.send(embed=embed)
+
+    @commands.hybrid_command(name='transfer', description='Перевод кредитов другому пользователю')
+    @app_commands.describe(member='Пользователь для перевода', amount='Количество кредитов')
+    async def transfer(self, ctx, member: discord.Member, amount: int):
+        """Перевод кредитов другому пользователю"""
+        if member.id == ctx.author.id:
+            await ctx.send("❌ Вы не можете переводить кредиты самому себе!")
+            return
+        
+        # Загружаем конфиг для проверки, является ли пользователь верховным правителем
+        with open('config.json', 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        supreme_ruler_id = config['government_structure']['supreme_ruler']
+        is_supreme_ruler = ctx.author.id == int(supreme_ruler_id)
+        
+        sender_balance = await self.db.get_balance(ctx.author.id)
+        
+        # Если пользователь - верховный правитель, он может переводить больше, чем у него есть
+        if is_supreme_ruler:
+            # Верховный правитель может создавать кредиты для перевода
+            await self.db.add_credits(ctx.author.id, amount)
+            await self.db.add_credits(ctx.author.id, -amount)  # компенсируем для корректного баланса
+            await self.db.add_credits(member.id, amount)
+            
             embed = discord.Embed(
-                title="Предмет не найден",
-                description=f"Не найдено предметов, соответствующих '{item_name}' в магазине.",
-                color=0xFF0000
+                title="💸 Перевод (Специальная транзакция)",
+                description=f"{ctx.author.mention} (Верховный Правитель) перевел {amount} кредитов {member.mention}",
+                color=0xFFD700
             )
             await ctx.send(embed=embed)
             return
-
-        item_id, item_name, price = target_item
         
-        success, message = await buy_item(ctx.author.id, item_id)
+        if sender_balance < amount:
+            await ctx.send("❌ У вас недостаточно кредитов для перевода!")
+            return
+        
+        if amount <= 0:
+            await ctx.send("❌ Количество кредитов должно быть больше 0!")
+            return
+        
+        await self.db.add_credits(ctx.author.id, -amount)
+        await self.db.add_credits(member.id, amount)
         
         embed = discord.Embed(
-            title="Результат покупки" if success else "Ошибка покупки",
-            description=message,
-            color=0x00FF00 if success else 0xFF0000
+            title="💸 Перевод",
+            description=f"{ctx.author.mention} перевел {amount} кредитов {member.mention}",
+            color=0x00FF00
         )
         await ctx.send(embed=embed)
 
-    @commands.command(name='inventory')
+    @commands.hybrid_command(name='shop', description='Отображение имперского рынка')
+    async def shop(self, ctx):
+        """Отображение имперского рынка"""
+        items = await self.db.get_shop_items()
+        
+        if not items:
+            # Добавляем стандартные товары в магазин
+            default_items = [
+                ("🔫 Имперский Бластер", 500, "Стандартное оружие Империи"),
+                ("⚔️ Элитный Меч", 1000, "Особое оружие для элитных войск"),
+                ("🛡️ Имперский Щит", 750, "Защитное оборудование"),
+                ("🔋 Энергетический Щит", 300, "Дополнительная защита"),
+                ("🎯 Прицел Снайпера", 400, "Улучшает точность стрельбы"),
+                ("⚡ Турбо-Заряд", 200, "Ускоряет перезарядку оружия"),
+                ("🎭 Маска Дарта Вейдера", 1500, "Легендарная маска"),
+                ("🔮 Сфера Предсказаний", 2000, "Помогает предвидеть будущее"),
+                ("📜 Карта Галактики", 600, "Показывает расположение планет"),
+                ("👑 Имперская Корона", 3000, "Символ высшей власти")
+            ]
+            
+            for item_name, price, description in default_items:
+                await self.db.add_item_to_shop(item_name, price, description)
+            
+            items = await self.db.get_shop_items()
+        
+        embed = discord.Embed(
+            title="🛒 Имперский Рынок",
+            description="Добро пожаловать на Имперский Рынок! Здесь вы можете приобрести различные товары за кредиты.",
+            color=0xFFD700
+        )
+        
+        for item in items:
+            embed.add_field(
+                name=f"{item[1]} - {item[2]} кредитов",
+                value=item[3],
+                inline=False
+            )
+        
+        embed.set_footer(text="Используйте команду !buy <название_предмета> для покупки")
+        await ctx.send(embed=embed)
+
+    @commands.hybrid_command(name='buy', description='Покупка предмета из магазина')
+    @app_commands.describe(item_name='Название предмета для покупки')
+    async def buy(self, ctx, *, item_name: str):
+        """Покупка предмета из магазина"""
+        # Загружаем конфиг для проверки, является ли пользователь верховным правителем
+        with open('config.json', 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        supreme_ruler_id = config['government_structure']['supreme_ruler']
+        is_supreme_ruler = ctx.author.id == int(supreme_ruler_id)
+        
+        item = await self.db.get_item_by_name(item_name)
+        if not item:
+            await ctx.send(f"❌ Предмет '{item_name}' не найден в магазине!")
+            return
+        
+        price = item[2]
+        
+        # Если пользователь - верховный правитель, он может купить любой предмет бесплатно
+        if is_supreme_ruler:
+            await self.db.add_item_to_inventory(ctx.author.id, item[0])  # item[0] - это id предмета
+            
+            embed = discord.Embed(
+                title="👑 Покупка (Специальная транзакция)",
+                description=f"Верховный Правитель {ctx.author.mention} получил {item[1]} бесплатно!",
+                color=0xFFFF00
+            )
+            await ctx.send(embed=embed)
+            return
+        
+        user_balance = await self.db.get_balance(ctx.author.id)
+        
+        if user_balance < price:
+            await ctx.send(f"❌ У вас недостаточно кредитов! Необходимо {price}, у вас {user_balance}")
+            return
+        
+        await self.db.add_credits(ctx.author.id, -price)
+        await self.db.add_item_to_inventory(ctx.author.id, item[0])  # item[0] - это id предмета
+        
+        embed = discord.Embed(
+            title="✅ Покупка успешна",
+            description=f"Вы купили {item[1]} за {price} кредитов!",
+            color=0x00FF00
+        )
+        await ctx.send(embed=embed)
+
+    @commands.hybrid_command(name='inventory', description='Просмотр инвентаря пользователя')
+    @app_commands.describe(member='Пользователь для просмотра инвентаря')
     async def inventory(self, ctx, member: discord.Member = None):
         """Просмотр инвентаря пользователя"""
-        if member is None:
+        if not member:
             member = ctx.author
-
-        user_inventory = await get_user_inventory(member.id)
-
-        if not user_inventory:
+        
+        # Загружаем конфиг для проверки, является ли пользователь верховным правителем
+        with open('config.json', 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        supreme_ruler_id = config['government_structure']['supreme_ruler']
+        is_supreme_ruler = member.id == int(supreme_ruler_id)
+        
+        inventory = await self.db.get_inventory(member.id)
+        
+        if not inventory:
             embed = discord.Embed(
-                title=f"Инвентарь {member.display_name}",
+                title=f"🎒 Инвентарь {member.display_name}",
                 description="Инвентарь пуст",
-                color=0xFFFF00
+                color=0xFFA500
             )
         else:
             embed = discord.Embed(
-                title=f"Инвентарь {member.display_name}",
-                color=0xFFFF00
+                title=f"🎒 Инвентарь {member.display_name}",
+                description="Ваши предметы:",
+                color=0x00FF00
             )
-            for item_name, quantity in user_inventory:
-                embed.add_field(
-                    name=item_name,
-                    value=f"Количество: {quantity}",
-                    inline=False
-                )
-
+            
+            for item in inventory:
+                item_details = await self.db.get_item_by_id(item[1])  # item[1] - это item_id
+                if item_details:
+                    embed.add_field(
+                        name=item_details[1],  # название предмета
+                        value=item_details[3],  # описание предмета
+                        inline=False
+                    )
+        
+        # Если пользователь - верховный правитель, добавляем специальное сообщение
+        if is_supreme_ruler:
+            embed.add_field(
+                name="Статус",
+                value="👑 Верховный Правитель Федерации Галактической Империи",
+                inline=False
+            )
+        
         await ctx.send(embed=embed)
 
-    @commands.command(name='transfer')
-    async def transfer_credits(self, ctx, member: discord.Member, amount: int):
-        """Перевод кредитов другому пользователю"""
+    @commands.hybrid_command(name='use', description='Использование предмета из инвентаря')
+    @app_commands.describe(item_name='Название предмета для использования')
+    async def use(self, ctx, *, item_name: str):
+        """Использование предмета из инвентаря"""
+        # Загружаем конфиг для проверки, является ли пользователь верховным правителем
+        with open('config.json', 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        supreme_ruler_id = config['government_structure']['supreme_ruler']
+        is_supreme_ruler = ctx.author.id == int(supreme_ruler_id)
+        
+        item = await self.db.get_item_by_name(item_name)
+        if not item:
+            await ctx.send(f"❌ Предмет '{item_name}' не найден!")
+            return
+        
+        user_inventory = await self.db.get_inventory(ctx.author.id)
+        item_exists = any(inv_item[1] == item[0] for inv_item in user_inventory)  # item[0] - это id предмета
+        
+        # Если пользователь - верховный правитель, он может использовать любой предмет
+        if is_supreme_ruler or item_exists:
+            # В зависимости от типа предмета выполняем разные действия
+            item_effects = {
+                "🔫 Имперский Бластер": "💥 Вы использовали Имперский Бластер!",
+                "⚔️ Элитный Меч": "⚔️ Вы взмахнули Элитным Мечом!",
+                "🛡️ Имперский Щит": "🛡️ Вы активировали Имперский Щит!",
+                "🎭 Маска Дарта Вейдера": "~-~- Вы надели Маску Дарта Вейдера!"
+            }
+            
+            effect = item_effects.get(item[1], f"✨ Вы использовали {item[1]}!")
+            
+            embed = discord.Embed(
+                title="✨ Использование предмета",
+                description=effect,
+                color=0x00FF00
+            )
+            
+            # Если пользователь - верховный правитель, добавляем специальное сообщение
+            if is_supreme_ruler:
+                embed.add_field(
+                    name="Специальное использование",
+                    value="Как Верховный Правитель, вы можете использовать любой предмет!",
+                    inline=False
+                )
+            
+            await ctx.send(embed=embed)
+        else:
+            await ctx.send(f"❌ У вас нет предмета '{item_name}' в инвентаре!")
+
+    @commands.hybrid_command(name='trade', description='Обмен предметами с другим участником')
+    @app_commands.describe(member='Пользователь для обмена', item_name='Название предмета для передачи', quantity='Количество предметов')
+    async def trade(self, ctx, member: discord.Member, *, item_name: str, quantity: int = 1):
+        """Обмен предметами с другим участником"""
         if member.id == ctx.author.id:
+            await ctx.send("❌ Вы не можете обмениваться с самим собой!")
+            return
+        
+        # Загружаем конфиг для проверки, является ли пользователь верховным правителем
+        with open('config.json', 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        supreme_ruler_id = config['government_structure']['supreme_ruler']
+        is_supreme_ruler = ctx.author.id == int(supreme_ruler_id)
+        
+        item = await self.db.get_item_by_name(item_name)
+        if not item:
+            await ctx.send(f"❌ Предмет '{item_name}' не найден!")
+            return
+        
+        user_inventory = await self.db.get_inventory(ctx.author.id)
+        user_item_count = sum(1 for inv_item in user_inventory if inv_item[1] == item[0])
+        
+        # Если пользователь - верховный правитель, он может торговать любым количеством предметов
+        if is_supreme_ruler:
+            # Верховный правитель может создавать предметы для торговли
+            for _ in range(quantity):
+                await self.db.add_item_to_inventory(member.id, item[0])
+            
             embed = discord.Embed(
-                title="Невозможно перевести",
-                description="Вы не можете перевести кредиты самому себе.",
-                color=0xFF0000
+                title="🔄 Обмен (Специальная транзакция)",
+                description=f"Верховный Правитель {ctx.author.mention} передал {quantity} шт. {item[1]} пользователю {member.mention}",
+                color=0xFFD700
             )
             await ctx.send(embed=embed)
             return
-
-        if amount <= 0:
-            embed = discord.Embed(
-                title="Неверная сумма",
-                description="Сумма перевода должна быть больше 0.",
-                color=0xFF0000
-            )
-            await ctx.send(embed=embed)
+        
+        if user_item_count < quantity:
+            await ctx.send(f"❌ У вас недостаточно предметов '{item_name}'! У вас {user_item_count}, нужно {quantity}")
             return
-
-        sender_credits = await get_user_credits(ctx.author.id, ctx.guild.id)
-
-        if sender_credits < amount:
-            embed = discord.Embed(
-                title="Недостаточно средств",
-                description=f"У вас недостаточно кредитов для перевода. Ваш баланс: {sender_credits}",
-                color=0xFF0000
-            )
-            await ctx.send(embed=embed)
-            return
-
-        # Снимаем кредиты с отправителя
-        await add_credits(ctx.author.id, ctx.guild.id, -amount)
-        # Добавляем кредиты получателю
-        recipient_new_balance = await add_credits(member.id, ctx.guild.id, amount)
-
+        
+        # Удаляем предметы у отправителя и добавляем получателю
+        for _ in range(quantity):
+            await self.db.remove_item_from_inventory(ctx.author.id, item[0])
+            await self.db.add_item_to_inventory(member.id, item[0])
+        
         embed = discord.Embed(
-            title="Перевод выполнен",
-            description=f"{ctx.author.mention} перевел {amount} кредитов пользователю {member.mention}\nБаланс получателя: {recipient_new_balance}",
+            title="🔄 Обмен",
+            description=f"{ctx.author.mention} передал {quantity} шт. {item[1]} пользователю {member.mention}",
             color=0x00FF00
         )
         await ctx.send(embed=embed)
 
+    @commands.hybrid_command(name='givecredits', description='Выдача кредитов пользователю (только для администраторов)')
+    @app_commands.describe(member='Пользователь для выдачи кредитов', amount='Количество кредитов')
+    @commands.check(lambda ctx: ctx.author.guild_permissions.administrator or 
+                   ctx.author.id == int(json.load(open('config.json', 'r', encoding='utf-8'))['government_structure']['supreme_ruler']))
+    async def givecredits(self, ctx, member: discord.Member, amount: int):
+        """Выдача кредитов пользователю (только для администраторов)"""
+        # Загружаем конфиг для проверки, является ли пользователь верховным правителем
+        with open('config.json', 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        supreme_ruler_id = config['government_structure']['supreme_ruler']
+        is_supreme_ruler = ctx.author.id == int(supreme_ruler_id)
+        
+        # Проверяем права
+        if not (ctx.author.guild_permissions.administrator or is_supreme_ruler):
+            await ctx.send("❌ У вас нет прав для выполнения этой команды!")
+            return
+        
+        if amount <= 0:
+            await ctx.send("❌ Количество кредитов должно быть больше 0!")
+            return
+        
+        await self.db.add_credits(member.id, amount)
+        
+        embed = discord.Embed(
+            title="💳 Выдача кредитов",
+            description=f"{ctx.author.mention} выдал {amount} кредитов пользователю {member.mention}",
+            color=0x00FF00
+        )
+        
+        # Если пользователь - верховный правитель, добавляем специальное сообщение
+        if is_supreme_ruler:
+            embed.set_footer(text="Выделено Верховным Правителем Федерации Галактической Империи")
+        
+        await ctx.send(embed=embed)
+
 async def setup(bot):
-    await bot.add_cog(EconomyCog(bot))
+    db = bot.db  # используем общую базу данных
+    await bot.add_cog(EconomyCog(bot, db))

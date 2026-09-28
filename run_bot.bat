@@ -1,8 +1,7 @@
 @echo off
-echo Starting Galactic Empire Discord Bot...
-echo.
-
+echo Запуск Галактического Имперского Бота...
 python main.py
+pause
 
 if %errorlevel% neq 0 (
     echo The bot failed to start. Please check the error messages above.

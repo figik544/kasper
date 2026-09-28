@@ -1,333 +1,351 @@
 import discord
 from discord.ext import commands
-import asyncio
+from discord import app_commands
 import random
-from datetime import datetime
-import aiosqlite
 import json
 
-from .database import get_user_data, add_credits, get_user_credits, get_guild_config, update_guild_config
-
-# Загрузка конфигурации
-with open('config.json', 'r', encoding='utf-8') as f:
-    config = json.load(f)
-
-class StarWarsCog(commands.Cog, name="Звёздные Войны"):
-    def __init__(self, bot):
+class StarWarsCog(commands.Cog):
+    def __init__(self, bot, db):
         self.bot = bot
+        self.db = db
 
-    @commands.command(name='faction')
-    async def show_faction(self, ctx):
+    @commands.hybrid_command(name='faction', description='Показывает информацию о фракциях в Галактике')
+    async def faction(self, ctx):
         """Показывает информацию о фракциях в Галактике"""
-        embed = discord.Embed(
-            title="Фракции Галактической Империи",
-            color=0x000000
-        )
-        embed.add_field(
-            name="Империя",
-            value="Верховная власть в галактике. Основана Палпатином для установления порядка.\n"
-                  "Лидеры: Император, Тёмные Лорды, Верховное Командование",
-            inline=False
-        )
-        embed.add_field(
-            name="Повстанцы",
-            value="Оппозиционная организация, борющаяся за свободу галактики.\n"
-                  "Лидеры: Лидеры Альянса, Командиры повстанческих клеток",
-            inline=False
-        )
-        embed.add_field(
-            name="Джедаи",
-            value="Хранители мира и справедливости в галактике.\n"
-                  "Лидеры: Совет Джедаев, Мастера Джедаи",
-            inline=False
-        )
-        embed.add_field(
-            name="Ситхи",
-            value="Последователи темной стороны Силы.\n"
-                  "Лидеры: Тёмные Лорды Ситхов",
-            inline=False
-        )
-        await ctx.send(embed=embed)
-
-    @commands.command(name='lightsaber_color')
-    async def lightsaber_color(self, ctx):
-        """Определение цвета светового меча по типу персонажа"""
-        colors = {
-            "джедай": ["синий", "зелёный", "фиолетовый", "белый"],
-            "ситх": ["красный"],
-            "инквизитор": ["красный", "красный двойной клинок"],
-            "джедай-скрытый": ["жёлтый"]
+        factions = {
+            "Империя": {
+                "description": "Авторитарное государство, контролирующее большую часть галактики. Основана на принципах порядка, контроля и подчинения.",
+                "leader": "Император Палпатин",
+                "colors": ["#000000", "#333333", "#666666"],
+                "ships": ["Звёздный Разрушитель", "TIE-истребитель", "Супер Звезда Смерти"]
+            },
+            "Республика": {
+                "description": "Демократическое государство, существовавшее до прихода Империи. Была основана на принципах справедливости и равенства.",
+                "leader": "Сенат Галактики",
+                "colors": ["#0000FF", "#00FFFF", "#FFFFFF"],
+                "ships": ["Корабль-республиканец", "Джедайский истребитель", "Корвет"]
+            },
+            "Повстанцы": {
+                "description": "Альянс, борющийся за свободу галактики от имперской тирании. Ценности: свобода, демократия, справедливость.",
+                "leader": "Мон Мотма",
+                "colors": ["#FF0000", "#FFD700", "#FFFFFF"],
+                "ships": ["X-wing", "Y-wing", "Миллениум Фалкон"]
+            },
+            "Джедаи": {
+                "description": "Древний орден, следящий за балансом Силы. Используют световые мечи и силу для поддержания мира.",
+                "leader": "Высший совет Джедаев",
+                "colors": ["#0000FF", "#00FF00", "#FFFFFF"],
+                "ships": ["Джедайский звездолёт", "Корабль Джедаев", "Истребитель А-кинь"]
+            },
+            "Ситх": {
+                "description": "Темный орден, стремящийся к власти через Силу. Противоположность Джедаев, ценят силу и подчинение.",
+                "leader": "Повелитель ситхов",
+                "colors": ["#AA0000", "#000000", "#8B0000"],
+                "ships": ["Звёздный Разрушитель ситхов", "TIE-истребитель тьмы", "Корабль ситхов"]
+            }
         }
         
-        user_data = await get_user_data(ctx.author.id, ctx.guild.id)
-        if user_data and 'rank' in user_data:
-            rank = user_data['rank'].lower()
-            if 'джедай' in rank:
-                color = random.choice(colors['джедай'])
-            elif 'ситх' in rank or 'тёмный лорд' in rank:
-                color = random.choice(colors['ситх'])
-            elif 'инквизитор' in rank:
-                color = random.choice(colors['инквизитор'])
-            else:
-                color = random.choice(colors['джедай'] + colors['ситх'])
-        else:
-            color = random.choice(colors['джедай'])
+        embed = discord.Embed(
+            title="🌌 Фракции Галактики",
+            description="Основные фракции, влияющие на судьбу галактики",
+            color=0xFFD700
+        )
+        
+        for name, info in factions.items():
+            embed.add_field(
+                name=name,
+                value=f"**Лидер:** {info['leader']}\n"
+                      f"**Описание:** {info['description']}\n"
+                      f"**Цвета:** {' '.join(info['colors'])}\n"
+                      f"**Корабли:** {', '.join(info['ships'])}",
+                inline=False
+            )
+        
+        await ctx.send(embed=embed)
+
+    @commands.hybrid_command(name='imperial_motto', description='Показывает имперский лозунг')
+    async def imperial_motto(self, ctx):
+        """Показывает имперский лозунг"""
+        mottos = [
+            "«Мир через власть»",
+            "«Порядок через контроль»",
+            "«Единство через подчинение»",
+            "«Сила через дисциплину»",
+            "«Безопасность через власть»",
+            "«Стабильность через страх»"
+        ]
+        
+        motto = random.choice(mottos)
         
         embed = discord.Embed(
-            title="Цвет светового меча",
-            description=f"{ctx.author.mention}, ваш световой меч светится {color} цветом!",
-            color=self.get_color_by_name(color)
+            title=" Imperium 🏛️",
+            description=motto,
+            color=0x000000
         )
         await ctx.send(embed=embed)
 
-    def get_color_by_name(self, color_name):
-        """Возвращает цвет Discord по названию"""
-        colors_map = {
+    @commands.hybrid_command(name='imperial_hierarchy', description='Показывает имперскую иерархию')
+    async def imperial_hierarchy(self, ctx):
+        """Показывает имперскую иерархию"""
+        # Загружаем конфиг для получения информации о верховном правителе
+        with open('config.json', 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        supreme_ruler_id = config['government_structure']['supreme_ruler']
+        supreme_ruler = self.bot.get_user(int(supreme_ruler_id)) if supreme_ruler_id else None
+        
+        hierarchy = [
+            ("Император", "Палпатин", "Высшая власть в Галактике"),
+        ]
+        
+        # Добавляем верховного правителя если он назначен
+        if supreme_ruler:
+            hierarchy.insert(1, (f"Верховный Правитель (Дарт Вейдер)", supreme_ruler.display_name, "Высшая исполнительная власть в Федерации Галактической Империи"))
+        else:
+            hierarchy.insert(1, ("Верховный Правитель (Дарт Вейдер)", "-", "Высшая исполнительная власть в Федерации Галактической Империи"))
+        
+        hierarchy.extend([
+            ("Лорды ситхов", "Вейдер, Молл", "Темные повелители Силы"),
+            ("Гранд-Мафф", "Тиа", "Высшие администраторы Империи"),
+            ("Адмиралы", "Тиа, Вейтерс", "Командование флотом"),
+            ("Генералы", "Медон, Кенник", "Командование армией"),
+            ("Офицеры", "-", "Управление операциями"),
+            ("Штурмовики", "-", "Пехота Империи"),
+            ("Разведчики", "-", "Специальные операции")
+        ])
+        
+        embed = discord.Embed(
+            title="🏛️ Имперская Иерархия",
+            description="Структура власти в Галактической Империи",
+            color=0x333333
+        )
+        
+        for position, notable_figures, description in hierarchy:
+            embed.add_field(
+                name=position,
+                value=f"**Известные представители:** {notable_figures}\n"
+                      f"**Функции:** {description}",
+                inline=False
+            )
+        
+        await ctx.send(embed=embed)
+
+    @commands.hybrid_command(name='lightsaber_color', description='Определение цвета светового меча по типу персонажа')
+    async def lightsaber_color(self, ctx):
+        """Определение цвета светового меча по типу персонажа"""
+        # Загружаем конфиг для проверки, является ли пользователь верховным правителем
+        with open('config.json', 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        supreme_ruler_id = config['government_structure']['supreme_ruler']
+        is_supreme_ruler = ctx.author.id == int(supreme_ruler_id)
+        
+        colors = {
+            "джедай": ["синий", "зелёный", "фиолетовый", "белый"],
+            "ситх": ["красный", "оранжевый", "фиолетовый"],
+            "инквизитор": ["красный", "красный с двумя клинками"],
+            "мастер джедай": ["синий", "зелёный", "золотой"],
+            "лорд ситхов": ["красный", "чёрный", "фиолетовый"]
+        }
+        
+        # Определяем тип персонажа пользователя на основе его ранга
+        user_rank = await self.db.get_user_rank(ctx.author.id)
+        if not user_rank:
+            user_rank = "джедай"  # по умолчанию
+        
+        user_rank_lower = user_rank.lower()
+        available_colors = []
+        
+        for rank_type, colors_list in colors.items():
+            if rank_type in user_rank_lower:
+                available_colors.extend(colors_list)
+                break
+        
+        if not available_colors:
+            # Если не нашли соответствие, выбираем из всех цветов джедая
+            available_colors = colors["джедай"]
+        
+        # Если пользователь - верховный правитель, он может использовать особый цвет
+        if is_supreme_ruler:
+            available_colors.append("чёрный")  # Особый цвет для верховного правителя
+        
+        chosen_color = random.choice(available_colors)
+        
+        embed = discord.Embed(
+            title="⚔️ Цвет светового меча",
+            description=f"{ctx.author.mention}, ваш световой меч имеет цвет: **{chosen_color}**",
+            color=self.get_color_hex(chosen_color)
+        )
+        
+        if is_supreme_ruler:
+            embed.set_footer(text="Как Верховный Правитель, вы имеете доступ к особому цвету светового меча")
+        
+        await ctx.send(embed=embed)
+
+    def get_color_hex(self, color_name):
+        """Возвращает HEX-код цвета по названию"""
+        color_map = {
             "синий": 0x0000FF,
             "зелёный": 0x00FF00,
             "красный": 0xFF0000,
             "фиолетовый": 0x800080,
             "белый": 0xFFFFFF,
-            "жёлтый": 0xFFFF00,
-            "красный двойной клинок": 0xCC0000
+            "оранжевый": 0xFFA500,
+            "чёрный": 0x000000,
+            "золотой": 0xFFD700
         }
-        return colors_map.get(color_name.lower(), 0x000000)
+        return color_map.get(color_name.lower(), 0xFFFFFF)
 
-    @commands.command(name='imperial_hierarchy')
-    async def imperial_hierarchy(self, ctx):
-        """Показывает имперскую иерархию"""
-        embed = discord.Embed(
-            title="Имперская Иерархия",
-            description="Структура власти в Галактической Империи",
-            color=0x000000
-        )
-        hierarchy = [
-            ("Император", "Верховный правитель всей Империи"),
-            ("Тёмный Лорд", "Мощный пользователь темной стороны"),
-            ("Адмирал", "Командование флотом"),
-            ("Генерал", "Командование армией"),
-            ("Полковник", "Командование полком"),
-            ("Майор", "Старший офицер"),
-            ("Капитан", "Командир роты"),
-            ("Лейтенант", "Младший офицер"),
-            ("Сержант", "Старшина"),
-            ("Корпорал", "Младший сержант"),
-            ("Штурмовик", "Базовый солдат"),
-            ("Рекрут", "Новичок")
+    @commands.hybrid_command(name='force_ability', description='Показывает случайную способность Силы')
+    async def force_ability(self, ctx):
+        """Показывает случайную способность Силы"""
+        # Загружаем конфиг для проверки, является ли пользователь верховным правителем
+        with open('config.json', 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        supreme_ruler_id = config['government_structure']['supreme_ruler']
+        is_supreme_ruler = ctx.author.id == int(supreme_ruler_id)
+        
+        abilities = [
+            ("Телекинез", "Перемещение объектов с помощью Силы", "Джедаи, Ситх"),
+            ("Телепатия", "Общение на расстоянии", "Джедаи"),
+            ("Предвидение", "Видение будущего", "Джедаи, Ситх"),
+            ("Ментальный контроль", "Влияние на сознание других", "Ситх"),
+            ("Целительство", "Лечение ран и болезней", "Джедаи"),
+            ("Молния", "Атака электрическими разрядами", "Ситх"),
+            ("Удушье", "Атака Силой", "Ситх"),
+            ("Щит", "Защита от атак", "Джедаи"),
+            ("Прыжок", "Сверхчеловеческие прыжки", "Джедаи, Ситх"),
+            ("Скорость", "Сверхчеловеческая скорость", "Джедаи, Ситх")
         ]
         
-        for rank, description in hierarchy:
-            embed.add_field(name=rank, value=description, inline=False)
+        ability = random.choice(abilities)
+        name, description, users = ability
+        
+        embed = discord.Embed(
+            title="🌟 Способность Силы",
+            description=f"**{name}**\n{description}\n*Используется: {users}*",
+            color=0x00FFFF
+        )
+        
+        # Если пользователь - верховный правитель, добавляем специальное сообщение
+        if is_supreme_ruler:
+            embed.set_footer(text="Как Верховный Правитель, вы обладаете особым могуществом в Силе")
         
         await ctx.send(embed=embed)
 
-    @commands.command(name='galactic_fact')
+    @commands.hybrid_command(name='galactic_fact', description='Показывает интересный факт о галактике')
     async def galactic_fact(self, ctx):
         """Показывает интересный факт о галактике"""
         facts = [
-            "Галактика состоит из более чем 1000 секторов.",
-            "Империя контролирует более 1 миллиона планет.",
-            "Каждый год в галактике происходит около 10000 звёздных сражений.",
-            "Световые мечи используют кристаллы силы для фокусировки энергии.",
-            "Имперские штурмовики проходят обучение на планете Камдайн.",
-            "Куай-Хен - это форма жизни, способная влиять на Силу.",
-            "Гиперпространственные прыжки возможны благодаря навигационным компьютерам.",
-            "Самый известный пилот истребителей TIE - Ас Траппера.",
-            "Кореллианский бегун - самый быстрый корабль в галактике.",
-            "Двуствольные бластеры были изобретены ещё до основания Республики."
+            "Галактика состоит из более чем 200 миллиардов звёзд.",
+            "Империя контролирует более 1 миллиона планетных систем.",
+            "Световой меч требует кристалл силы для своей работы.",
+            "Джедаи используют светлую сторону Силы, а ситх - тёмную.",
+            "Звёздные Разрушители могут достигать длины до 12 километров.",
+            "Имперские штурмовики обучены на планете Камдайн.",
+            "Самая быстрая скорость в гиперпространстве - фактор 1.",
+            "Силу невозможно измерить стандартными приборами.",
+            "Каждый световой меч уникален и создаётся своим владельцем.",
+            "Империя затратила более 1 триллиона кредитов на создание Звезды Смерти."
         ]
         
         fact = random.choice(facts)
         
         embed = discord.Embed(
-            title="Факт о Галактике",
+            title="📚 Галактический Факт",
             description=fact,
-            color=0x4B0082
+            color=0x8A2BE2
         )
         await ctx.send(embed=embed)
 
-    @commands.command(name='battle_simulator')
+    @commands.hybrid_command(name='battle_simulator', description='Симуляция битвы между двумя фракциями')
+    @app_commands.describe(faction1='Первая фракция', faction2='Вторая фракция')
     async def battle_simulator(self, ctx, faction1: str, faction2: str):
         """Симуляция битвы между двумя фракциями"""
+        # Загружаем конфиг для проверки, является ли пользователь верховным правителем
+        with open('config.json', 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        supreme_ruler_id = config['government_structure']['supreme_ruler']
+        is_supreme_ruler = ctx.author.id == int(supreme_ruler_id)
+        
         factions = {
-            "империя": {"power": 90, "defense": 85, "speed": 70},
-            "повстанцы": {"power": 75, "defense": 70, "speed": 85},
-            "джедаи": {"power": 80, "defense": 80, "speed": 80},
-            "ситх": {"power": 95, "defense": 70, "speed": 85}
+            "империя": {"strength": 90, "defense": 85, "technology": 95},
+            "повстанцы": {"strength": 70, "defense": 75, "technology": 65},
+            "джедаи": {"strength": 80, "defense": 85, "force": 100},
+            "ситх": {"strength": 85, "defense": 75, "force": 95},
+            "республика": {"strength": 75, "defense": 80, "technology": 85}
         }
         
-        f1 = faction1.lower()
-        f2 = faction2.lower()
+        faction1_lower = faction1.lower()
+        faction2_lower = faction2.lower()
         
-        if f1 not in factions or f2 not in factions:
-            embed = discord.Embed(
-                title="Неверная фракция",
-                description="Доступные фракции: Империя, Повстанцы, Джедаи, Ситх",
-                color=0xFF0000
-            )
-            await ctx.send(embed=embed)
+        if faction1_lower not in factions or faction2_lower not in factions:
+            await ctx.send("❌ Одна или обе фракции не найдены! Используйте: Империя, Повстанцы, Джедаи, Ситх, Республика")
             return
         
         # Симуляция битвы
-        f1_stats = factions[f1]
-        f2_stats = factions[f2]
+        faction1_stats = factions[faction1_lower]
+        faction2_stats = factions[faction2_lower]
         
-        # Расчет результатов
-        f1_score = (f1_stats['power'] * 0.4) + (f1_stats['defense'] * 0.3) + (f1_stats['speed'] * 0.3)
-        f2_score = (f2_stats['power'] * 0.4) + (f2_stats['defense'] * 0.3) + (f2_stats['speed'] * 0.3)
-        
-        # Добавляем немного случайности
-        f1_score += random.randint(-10, 10)
-        f2_score += random.randint(-10, 10)
-        
-        embed = discord.Embed(
-            title=f"Симуляция битвы: {faction1.title()} vs {faction2.title()}",
-            color=0xFF4500
+        # Расчет силы каждой стороны
+        faction1_power = (
+            faction1_stats["strength"] + 
+            faction1_stats["defense"] + 
+            faction1_stats.get("technology", 0) + 
+            faction1_stats.get("force", 0)
         )
         
-        if f1_score > f2_score:
-            winner = faction1.title()
-            loser = faction2.title()
-        else:
-            winner = faction2.title()
-            loser = faction1.title()
+        faction2_power = (
+            faction2_stats["strength"] + 
+            faction2_stats["defense"] + 
+            faction2_stats.get("technology", 0) + 
+            faction2_stats.get("force", 0)
+        )
         
-        embed.add_field(name="Победитель", value=winner, inline=False)
-        embed.add_field(name="Результаты", 
-                       value=f"{faction1.title()}: {round(f1_score)} очков\n"
-                             f"{faction2.title()}: {round(f2_score)} очков", 
-                       inline=False)
+        # Добавляем бонус верховному правителю
+        if is_supreme_ruler:
+            faction1_power = int(faction1_power * 1.2) if faction1_lower == "империя" or faction1_lower == "ситх" else faction1_power
+            faction2_power = int(faction2_power * 1.2) if faction2_lower == "империя" or faction2_lower == "ситх" else faction2_power
         
-        await ctx.send(embed=embed)
-
-    @commands.command(name='force_ability')
-    async def force_ability(self, ctx):
-        """Показывает случайную способность Силы"""
-        abilities = [
-            ("Телекинез", "Перемещение объектов силой мысли"),
-            ("Телепатия", "Общение на расстоянии"),
-            ("Предвидение", "Видение будущего"),
-            ("Иллюзия", "Создание ложных образов"),
-            ("Ментальный контроль", "Влияние на разум других"),
-            ("Лечение", "Восстановление здоровья"),
-            ("Молния", "Разрушительная атака темной стороны"),
-            ("Щит", "Защита от атак"),
-            ("Ускорение", "Повышение скорости движений"),
-            ("Прозрение", "Видение истинной природы вещей")
-        ]
-        
-        ability, description = random.choice(abilities)
+        # Добавляем немного рандома
+        faction1_power += random.randint(-20, 20)
+        faction2_power += random.randint(-20, 20)
         
         embed = discord.Embed(
-            title="Способность Силы",
-            description=f"**{ability}**\n{description}",
-            color=0x9370DB
+            title="⚔️ Симуляция Битвы",
+            description=f"{faction1.capitalize()} против {faction2.capitalize()}",
+            color=0xFF0000
         )
-        await ctx.send(embed=embed)
-
-    @commands.command(name='imperial_motto')
-    async def imperial_motto(self, ctx):
-        """Показывает имперский лозунг"""
-        mottoes = [
-            "Порядок через силу",
-            "Единство через контроль", 
-            "Стабильность через власть",
-            "Мир через господство",
-            "Сила через преданность"
-        ]
         
-        motto = random.choice(mottoes)
-        
-        embed = discord.Embed(
-            title="Имперский Лозунг",
-            description=f"\"{motto}\"",
-            color=0x2F4F4F
+        embed.add_field(
+            name=f"{faction1.capitalize()}",
+            value=f"Сила: {faction1_power}",
+            inline=True
         )
-        await ctx.send(embed=embed)
-
-    @commands.command(name='setup_imperial_server')
-    @commands.has_permissions(administrator=True)
-    async def setup_imperial_server(self, ctx):
-        """Настройка сервера в стиле Империи"""
-        # Создание тематических ролей
-        sw_roles = [
-            ("Император", 0x111111),
-            ("Тёмный Лорд", 0x222222),
-            ("Адмирал", 0x333333),
-            ("Генерал", 0x444444),
-            ("Полковник", 0x555555),
-            ("Майор", 0x666666),
-            ("Капитан", 0x777777),
-            ("Лейтенант", 0x888888),
-            ("Сержант", 0x999999),
-            ("Корпорал", 0xAAAAAA),
-            ("Штурмовик", 0xCCCCCC),
-            ("Рекрут", 0xFFFFFF),
-            ("Мофф", 0x4B0082),
-            ("Инквизитор", 0x800000),
-            ("Пилот ТА", 0x696969),
-            ("Имперский Офицер", 0x708090),
-            ("Имперский Гвардеец", 0xDC143C),
-            ("Королевский Гвардеец", 0xB22222),
-            ("Повелитель Ситхов", 0x8B0000),
-            ("Охотник за Джедаями", 0x2F4F4F),
-            ("Имперский Шпион", 0x228B22)
-        ]
         
-        created_roles = []
-        for role_name, color in sw_roles:
-            existing_role = discord.utils.get(ctx.guild.roles, name=role_name)
-            if not existing_role:
-                role = await ctx.guild.create_role(
-                    name=role_name,
-                    color=discord.Color(color),
-                    reason="Имперская тематическая роль"
-                )
-                created_roles.append(role_name)
-        
-        # Создание тематических каналов
-        categories = {
-            " имперская военная": [
-                "центр-командования",
-                "развертывание-войск",
-                "военный-архив"
-            ],
-            " галактическая политика": [
-                "сенат-империи",
-                "бюро-пропаганды",
-                "зал-совета"
-            ],
-            " имперская социальная": [
-                "коридор",
-                "зал-почёта",
-                "голо-театр"
-            ],
-            " имперская команда": [
-                "имперская-команда",
-                "журнал-безопасности",
-                "тронный-зал-императора"
-            ]
-        }
-        
-        created_channels = []
-        for cat_name, channels in categories.items():
-            category = await ctx.guild.create_category(cat_name)
-            for ch_name in channels:
-                if "голос" in ch_name or "зал" in ch_name:
-                    channel = await ctx.guild.create_voice_channel(ch_name, category=category)
-                else:
-                    channel = await ctx.guild.create_text_channel(ch_name, category=category)
-                created_channels.append(channel.name)
-        
-        # Обновляем конфигурацию сервера
-        await update_guild_config(ctx.guild.id, autorank_enabled=True, economy_enabled=True)
-        
-        embed = discord.Embed(
-            title="Сервер настроен в стиле Империи!",
-            description=f"Создано {len(created_roles)} ролей и {len(created_channels)} каналов",
-            color=0x000000
+        embed.add_field(
+            name=f"{faction2.capitalize()}",
+            value=f"Сила: {faction2_power}",
+            inline=True
         )
+        
+        winner = faction1 if faction1_power > faction2_power else faction2
+        loser = faction2 if winner == faction1 else faction1
+        
+        embed.add_field(
+            name="🏆 Победитель",
+            value=f"{winner.capitalize()}!",
+            inline=False
+        )
+        
+        # Если верховный правитель участвует в симуляции, добавляем специальное сообщение
+        if is_supreme_ruler and ("империя" in [faction1_lower, faction2_lower] or "ситх" in [faction1_lower, faction2_lower]):
+            embed.set_footer(text="Как Верховный Правитель, ваша сила удвоена в битвах за Империю или Ситхов")
+        
         await ctx.send(embed=embed)
 
 async def setup(bot):
-    await bot.add_cog(StarWarsCog(bot))
+    db = bot.db  # используем общую базу данных
+    await bot.add_cog(StarWarsCog(bot, db))

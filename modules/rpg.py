@@ -1,315 +1,241 @@
 import discord
 from discord.ext import commands
-import asyncio
+from discord import app_commands
 import random
-from datetime import datetime
-import aiosqlite
 import json
+from datetime import datetime, timedelta
 
-from .database import get_user_data, add_credits, get_user_credits, get_user_inventory
-
-# Загрузка конфигурации
-with open('config.json', 'r', encoding='utf-8') as f:
-    config = json.load(f)
-
-class RPGRolesCog(commands.Cog, name="РП и Роли"):
-    def __init__(self, bot):
+class RPGCog(commands.Cog):
+    def __init__(self, bot, db):
         self.bot = bot
+        self.db = db
 
-    @commands.command(name='char_create')
-    async def create_character(self, ctx, *, char_class):
-        """Создание персонажа с определённым классом"""
-        user_data = await get_user_data(ctx.author.id, ctx.guild.id)
-        
-        if not user_data:
-            embed = discord.Embed(
-                title="Создание персонажа",
-                description="Сначала необходимо создать профиль. Отправьте любое сообщение на сервере.",
-                color=0xFF0000
-            )
-            await ctx.send(embed=embed)
-            return
-
-        # Здесь можно реализовать систему классов персонажей
-        available_classes = ["джедай", "ситх", "штурмовик", "офицер", "повстанец", "дипломат"]
-        
-        if char_class.lower() not in available_classes:
-            embed = discord.Embed(
-                title="Неверный класс персонажа",
-                description=f"Доступные классы: {', '.join(available_classes)}",
-                color=0xFF0000
-            )
-            await ctx.send(embed=embed)
-            return
-
-        # Пример: начисление бонусных кредитов за создание персонажа
-        bonus_credits = 100
-        new_balance = await add_credits(ctx.author.id, ctx.guild.id, bonus_credits)
-
-        embed = discord.Embed(
-            title="Персонаж создан!",
-            description=f"{ctx.author.mention}, вы стали {char_class.lower()}ом! Получено {bonus_credits} бонусных кредитов.",
-            color=0x00FF00
-        )
-        await ctx.send(embed=embed)
-
-    @commands.command(name='duel')
+    @commands.hybrid_command(name='duel', description='Вызов на дуэль другого участника')
+    @app_commands.describe(opponent='Оппонент для дуэли')
     async def duel(self, ctx, opponent: discord.Member):
         """Вызов на дуэль другого участника"""
         if opponent.id == ctx.author.id:
-            embed = discord.Embed(
-                title="Невозможно вызвать на дуэль",
-                description="Вы не можете вызвать на дуэль самого себя.",
-                color=0xFF0000
-            )
-            await ctx.send(embed=embed)
+            await ctx.send("❌ Вы не можете дуэлиться с самим собой!")
             return
-
+        
+        # Загружаем конфиг для проверки, является ли кто-то из участников верховным правителем
+        with open('config.json', 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        supreme_ruler_id = config['government_structure']['supreme_ruler']
+        is_attacker_supreme = ctx.author.id == int(supreme_ruler_id)
+        is_defender_supreme = opponent.id == int(supreme_ruler_id)
+        
+        # Проверяем, есть ли оба игрока в базе
+        for user_id in [ctx.author.id, opponent.id]:
+            user_data = await self.db.get_user_data(user_id)
+            if not user_data:
+                await self.db.create_user(user_id, ctx.guild.id)
+        
+        # Простая механика дуэли
+        attacker_power = random.randint(1, 100) + await self.db.get_user_level(ctx.author.id)
+        defender_power = random.randint(1, 100) + await self.db.get_user_level(opponent.id)
+        
+        # Если один из участников - верховный правитель, он получает бонус
+        if is_attacker_supreme:
+            attacker_power = int(attacker_power * 1.5)  # 50% бонус для верховного правителя
+        if is_defender_supreme:
+            defender_power = int(defender_power * 1.5)  # 50% бонус для верховного правителя
+        
         embed = discord.Embed(
-            title="Вызов на дуэль",
-            description=f"{ctx.author.mention} вызывает на дуэль {opponent.mention}! Реагируйте командой `!accept_duel`, чтобы принять вызов.",
-            color=0xFFFF00
+            title="⚔️ Дуэль",
+            description=f"{ctx.author.mention} вызвал на дуэль {opponent.mention}!",
+            color=0xFF0000
         )
         await ctx.send(embed=embed)
-
-        # Ждем реакцию противника
-        def check(m):
-            return m.author.id == opponent.id and m.content.lower() == '!accept_duel' and m.channel.id == ctx.channel.id
-
-        try:
-            await self.bot.wait_for('message', check=check, timeout=30.0)
-        except asyncio.TimeoutError:
-            embed = discord.Embed(
-                title="Дуэль отменена",
-                description=f"{opponent.mention} не ответил в течение 30 секунд. Дуэль отменена.",
-                color=0xFF0000
-            )
-            await ctx.send(embed=embed)
-            return
-
-        # Начинаем дуэль
-        embed = discord.Embed(
-            title="Дуэль началась!",
-            description=f"Дуэль между {ctx.author.mention} и {opponent.mention} начинается!",
-            color=0x00FF00
-        )
-        await ctx.send(embed=embed)
-
-        # Имитация дуэли
-        player1_hp = 100
-        player2_hp = 100
-
-        while player1_hp > 0 and player2_hp > 0:
-            # Атака первого игрока
-            damage1 = random.randint(10, 30)
-            player2_hp -= damage1
-            player2_hp = max(0, player2_hp)  # Не меньше 0
-
-            embed = discord.Embed(
-                title="Ход дуэли",
-                description=f"{ctx.author.display_name} атакует {opponent.display_name} и наносит {damage1} урона!\n"
-                           f"{ctx.author.display_name}: {player1_hp}/100 HP\n{opponent.display_name}: {player2_hp}/100 HP",
-                color=0xFFA500
-            )
-            await ctx.send(embed=embed)
-
-            if player2_hp <= 0:
+        
+        await ctx.send("⏳ Подготовка к дуэли...")
+        await ctx.send("💥 Дуэль началась!")
+        
+        # Симуляция боя
+        await ctx.send(f"{ctx.author.display_name} атакует с силой {attacker_power}!" + (" (Сила Верховного Правителя!)" if is_attacker_supreme else ""))
+        await ctx.send(f"{opponent.display_name} защищается с силой {defender_power}!" + (" (Сила Верховного Правителя!)" if is_defender_supreme else ""))
+        
+        winner = ctx.author if attacker_power > defender_power else opponent
+        loser = opponent if winner == ctx.author else ctx.author
+        
+        # Определяем победителя с учетом статуса верховного правителя
+        if is_attacker_supreme and is_defender_supreme:
+            # Если оба - верховные правители, побеждает тот, у кого больше сила
+            winner = ctx.author if attacker_power > defender_power else opponent
+        elif is_attacker_supreme and not is_defender_supreme:
+            # Если атакующий - верховный правитель, он получает преимущество
+            if abs(attacker_power - defender_power) < 20:  # Если разница небольшая
                 winner = ctx.author
-                loser = opponent
-                break
-
-            await asyncio.sleep(2)
-
-            # Атака второго игрока
-            damage2 = random.randint(10, 30)
-            player1_hp -= damage2
-            player1_hp = max(0, player1_hp)  # Не меньше 0
-
-            embed = discord.Embed(
-                title="Ход дуэли",
-                description=f"{opponent.display_name} атакует {ctx.author.display_name} и наносит {damage2} урона!\n"
-                           f"{ctx.author.display_name}: {player1_hp}/100 HP\n{opponent.display_name}: {player2_hp}/100 HP",
-                color=0xFFA500
-            )
-            await ctx.send(embed=embed)
-
-            if player1_hp <= 0:
+        elif is_defender_supreme and not is_attacker_supreme:
+            # Если защищающийся - верховный правитель, он получает преимущество
+            if abs(attacker_power - defender_power) < 20:  # Если разница небольшая
                 winner = opponent
-                loser = ctx.author
-                break
-
-            await asyncio.sleep(2)
-
-        # Определение победителя
-        reward = random.randint(50, 150)
-        new_balance = await add_credits(winner.id, ctx.guild.id, reward)
-
+        
+        # Награда победителю
+        reward = random.randint(50, 200)
+        await self.db.add_credits(winner.id, reward)
+        
         embed = discord.Embed(
-            title="Дуэль окончена!",
-            description=f"{winner.mention} побеждает в дуэли против {loser.mention} и получает {reward} кредитов!",
+            title="🏆 Результат дуэли",
+            description=f"{winner.mention} побеждает над {loser.mention}!\n"
+                       f"Победитель получает {reward} кредитов!",
             color=0x00FF00
         )
+        
+        # Если победитель - верховный правитель, добавляем специальное сообщение
+        with open('config.json', 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        supreme_ruler_id = config['government_structure']['supreme_ruler']
+        is_winner_supreme = winner.id == int(supreme_ruler_id)
+        
+        if is_winner_supreme:
+            embed.add_field(
+                name="Специальная победа",
+                value="Как Верховный Правитель, вы получаете усиленную награду!",
+                inline=False
+            )
+            reward = int(reward * 1.5)  # Увеличенная награда
+            await self.db.add_credits(winner.id, int(reward * 0.5))  # Дополнительно начисляем разницу
+        
         await ctx.send(embed=embed)
 
-    @commands.command(name='quest')
+    @commands.hybrid_command(name='quest', description='Выполнение задания для получения награды')
     async def quest(self, ctx):
         """Выполнение задания для получения награды"""
+        # Загружаем конфиг для проверки, является ли пользователь верховным правителем
+        with open('config.json', 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        supreme_ruler_id = config['government_structure']['supreme_ruler']
+        is_supreme_ruler = ctx.author.id == int(supreme_ruler_id)
+        
+        user_id = ctx.author.id
+        last_quest = await self.db.get_last_quest(user_id)
+        
+        if last_quest:
+            last_quest_time = datetime.fromisoformat(last_quest)
+            time_diff = datetime.now() - last_quest_time
+            
+            if time_diff.days < 1:
+                remaining_time = timedelta(days=1) - time_diff
+                hours, remainder = divmod(remaining_time.seconds, 3600)
+                minutes, _ = divmod(remainder, 60)
+                
+                embed = discord.Embed(
+                    title="⏳ Задание",
+                    description=f"Вы уже выполняли задание сегодня!\nСледующее задание через: {hours}ч {minutes}м",
+                    color=0xFFA500
+                )
+                await ctx.send(embed=embed)
+                return
+        
+        # Список возможных заданий
         quests = [
-            {"name": "Разведка вражеского флота", "difficulty": "лёгкое", "reward": 25},
-            {"name": "Поиск древнего артефакта", "difficulty": "среднее", "reward": 50},
-            {"name": "Спасти повстанческий корабль", "difficulty": "трудное", "reward": 100},
-            {"name": "Уничтожить базу повстанцев", "difficulty": "очень трудное", "reward": 200}
+            ("Патрулирование системы", 150, "Проверить все каналы на наличие нарушений"),
+            ("Сбор ресурсов", 200, "Собрать ресурсы для Империи"),
+            ("Обучение новобранцев", 100, "Провести тренировку для новых рекрутов"),
+            ("Разведка", 175, "Собрать информацию о противнике"),
+            ("Поддержка порядка", 125, "Помочь в модерации сервера")
         ]
-
+        
         quest = random.choice(quests)
-        difficulty_multiplier = {"лёгкое": 0.5, "среднее": 1, "трудное": 1.5, "очень трудное": 2}[quest["difficulty"]]
-        success_chance = int(70 / difficulty_multiplier)  # Чем сложнее, тем меньше шанс успеха
-
+        quest_name, base_reward, description = quest
+        
+        # Если пользователь - верховный правитель, он получает увеличенную награду
+        reward = int(base_reward * 1.5) if is_supreme_ruler else base_reward
+        
         embed = discord.Embed(
-            title="Получено задание",
-            description=f"Задание: {quest['name']} (уровень сложности: {quest['difficulty']})\n"
-                       f"Награда: {quest['reward']} кредитов\n"
-                       f"Шанс успеха: {min(success_chance, 95)}%",
+            title="🎯 Новое задание",
+            description=f"**{quest_name}**\n{description}",
             color=0x00FFFF
         )
+        
+        # Если пользователь - верховный правитель, добавляем специальное сообщение
+        if is_supreme_ruler:
+            embed.add_field(
+                name="Специальное задание",
+                value="Как Верховный Правитель, вы получаете повышенную награду!",
+                inline=False
+            )
+        
         await ctx.send(embed=embed)
-
-        # Симуляция выполнения задания
-        await asyncio.sleep(2)
-
-        if random.randint(1, 100) <= min(success_chance, 95):
-            reward = quest['reward']
-            new_balance = await add_credits(ctx.author.id, ctx.guild.id, reward)
-
-            embed = discord.Embed(
-                title="Задание выполнено!",
-                description=f"Вы успешно выполнили задание '{quest['name']}' и получили {reward} кредитов!",
-                color=0x00FF00
-            )
-        else:
-            embed = discord.Embed(
-                title="Задание провалено",
-                description=f"Вам не удалось выполнить задание '{quest['name']}'. Попробуйте снова.",
-                color=0xFF0000
-            )
-
-        await ctx.send(embed=embed)
-
-    @commands.command(name='trade')
-    async def trade_items(self, ctx, member: discord.Member, item_name: str, quantity: int = 1):
-        """Обмен предметами с другим участником"""
-        if member.id == ctx.author.id:
-            embed = discord.Embed(
-                title="Невозможно обменять",
-                description="Вы не можете обменять предметы сами с собой.",
-                color=0xFF0000
-            )
-            await ctx.send(embed=embed)
-            return
-
-        if quantity <= 0:
-            embed = discord.Embed(
-                title="Неверное количество",
-                description="Количество предметов должно быть больше 0.",
-                color=0xFF0000
-            )
-            await ctx.send(embed=embed)
-            return
-
-        # Получаем инвентарь обоих участников
-        author_inventory = await get_user_inventory(ctx.author.id)
-        member_inventory = await get_user_inventory(member.id)
-
-        # Проверяем, есть ли предмет у отправителя
-        item_found = False
-        for inv_item, inv_quantity in author_inventory:
-            if item_name.lower() in inv_item.lower():
-                if inv_quantity >= quantity:
-                    item_found = True
-                    item_actual_name = inv_item
-                break
-
-        if not item_found:
-            embed = discord.Embed(
-                title="Предмет не найден",
-                description=f"У вас нет {quantity} шт. '{item_name}' для обмена.",
-                color=0xFF0000
-            )
-            await ctx.send(embed=embed)
-            return
-
-        # Подтверждение обмена
+        
+        # Подтверждение выполнения задания
+        await self.db.set_last_quest(user_id)
+        await self.db.add_credits(user_id, reward)
+        
         embed = discord.Embed(
-            title="Запрос на обмен",
-            description=f"{ctx.author.mention} предлагает {member.mention} обмен:\n"
-                       f"{quantity} шт. '{item_actual_name}'",
-            color=0xFFFF00
-        )
-        await ctx.send(embed=embed)
-
-        # Ждем подтверждение
-        def check(m):
-            return m.author.id == member.id and m.content.lower() == '!accept_trade' and m.channel.id == ctx.channel.id
-
-        try:
-            await self.bot.wait_for('message', check=check, timeout=30.0)
-        except asyncio.TimeoutError:
-            embed = discord.Embed(
-                title="Обмен отменен",
-                description=f"{member.mention} не ответил в течение 30 секунд. Обмен отменен.",
-                color=0xFF0000
-            )
-            await ctx.send(embed=embed)
-            return
-
-        # Выполняем обмен
-        # TODO: В реальной системе нужно реализовать логику перемещения предметов между инвентарями
-        embed = discord.Embed(
-            title="Обмен завершен!",
-            description=f"Обмен между {ctx.author.mention} и {member.mention} завершен успешно!",
+            title="✅ Задание выполнено",
+            description=f"Вы успешно выполнили задание '{quest_name}' и получили {reward} кредитов!" + 
+                       (" (Бонус для Верховного Правителя!)" if is_supreme_ruler else ""),
             color=0x00FF00
         )
         await ctx.send(embed=embed)
 
-    @commands.command(name='use')
-    async def use_item(self, ctx, *, item_name):
-        """Использование предмета из инвентаря"""
-        user_inventory = await get_user_inventory(ctx.author.id)
-
-        # Находим предмет в инвентаре
-        item_found = False
-        for inv_item, quantity in user_inventory:
-            if item_name.lower() in inv_item.lower():
-                item_found = True
-                item_actual_name = inv_item
-                break
-
-        if not item_found:
-            embed = discord.Embed(
-                title="Предмет не найден",
-                description=f"У вас нет '{item_name}' в инвентаре.",
-                color=0xFF0000
-            )
-            await ctx.send(embed=embed)
+    @commands.hybrid_command(name='char_create', description='Создание персонажа с определённым классом')
+    @app_commands.describe(char_class='Класс персонажа')
+    async def char_create(self, ctx, char_class: str):
+        """Создание персонажа с определённым классом"""
+        # Загружаем конфиг для проверки, является ли пользователь верховным правителем
+        with open('config.json', 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        supreme_ruler_id = config['government_structure']['supreme_ruler']
+        is_supreme_ruler = ctx.author.id == int(supreme_ruler_id)
+        
+        user_id = ctx.author.id
+        
+        # Проверяем, есть ли уже персонаж у пользователя
+        existing_char = await self.db.get_character(user_id)
+        if existing_char:
+            await ctx.send("❌ У вас уже есть персонаж!")
             return
-
-        # Эффекты использования предметов
-        effects = {
-            "меч джедая": f"{ctx.author.mention} использует Меч Джедая! Вы чувствуете прилив сил Светлой стороны.",
-            "маска дарта вейдера": f"{ctx.author.mention} надевает Маску Дарта Вейдера! Вы излучаете ауру темной стороны.",
-            "имперский шлем": f"{ctx.author.mention} надевает Имперский шлем! Вы чувствуете себя частью Империи.",
-            "голокрон джедаев": f"{ctx.author.mention} активирует Голокрон Джедаев! Вы получаете мудрость древних.",
-            "голокрон ситхов": f"{ctx.author.mention} активирует Голокрон Ситхов! Вы овладеваете новыми темными знаниями."
+        
+        # Определяем характеристики на основе класса
+        class_stats = {
+            "джедай": {"сила": random.randint(60, 80), "ловкость": random.randint(70, 90), "интеллект": random.randint(80, 100)},
+            "ситх": {"сила": random.randint(80, 100), "ловкость": random.randint(60, 80), "интеллект": random.randint(70, 90)},
+            "штурмовик": {"сила": random.randint(50, 70), "ловкость": random.randint(50, 70), "интеллект": random.randint(40, 60)},
+            "офицер": {"сила": random.randint(40, 60), "ловкость": random.randint(50, 70), "интеллект": random.randint(70, 90)},
+            "техник": {"сила": random.randint(40, 60), "ловкость": random.randint(60, 80), "интеллект": random.randint(80, 100)}
         }
-
-        effect_message = effects.get(item_actual_name.lower(), f"{ctx.author.mention} использует {item_actual_name}!")
-
+        
+        char_class_lower = char_class.lower()
+        if char_class_lower not in class_stats:
+            await ctx.send(f"❌ Неверный класс персонажа! Доступные классы: {', '.join(class_stats.keys())}")
+            return
+        
+        stats = class_stats[char_class_lower]
+        
+        # Если пользователь - верховный правитель, он получает усиленные характеристики
+        if is_supreme_ruler:
+            stats = {key: value + 20 for key, value in stats.items()}  # Увеличиваем все характеристики на 20
+        
+        # Создаем персонажа в базе данных
+        await self.db.create_character(user_id, char_class, stats["сила"], stats["ловкость"], stats["интеллект"])
+        
         embed = discord.Embed(
-            title="Предмет использован",
-            description=effect_message,
-            color=0x9370DB
+            title="👤 Создание персонажа",
+            description=f"Персонаж успешно создан!",
+            color=0x00FF00
         )
+        embed.add_field(name="Класс", value=char_class.capitalize(), inline=False)
+        embed.add_field(name="Сила", value=stats["сила"], inline=True)
+        embed.add_field(name="Ловкость", value=stats["ловкость"], inline=True)
+        embed.add_field(name="Интеллект", value=stats["интеллект"], inline=True)
+        
+        # Если пользователь - верховный правитель, добавляем специальное сообщение
+        if is_supreme_ruler:
+            embed.add_field(
+                name="Специальные способности",
+                value="Как Верховный Правитель, ваш персонаж имеет усиленные характеристики!",
+                inline=False
+            )
+        
         await ctx.send(embed=embed)
 
 async def setup(bot):
-    await bot.add_cog(RPGRolesCog(bot))
+    db = bot.db  # используем общую базу данных
+    await bot.add_cog(RPGCog(bot, db))

@@ -6,8 +6,6 @@ from datetime import datetime, timedelta
 import asyncio
 import aiosqlite
 import logging
-import threading
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from enum import Enum
 
 # Настройка логирования
@@ -126,59 +124,62 @@ if not BOT_TOKEN:
 else:
     print(f"Токен загружен из {token_source} ({len(BOT_TOKEN)} символов). Значение скрыто.")
 
-# Настройка интентов
 intents = discord.Intents.default()
 intents.message_content = True
+intents.guilds = True
 intents.members = True
-intents.reactions = True
 
-# Инициализация бота
-class EmpireBot(commands.Bot):
-    async def setup_hook(self):
-        await load_extensions(self)
-
-
-bot = EmpireBot(command_prefix=config['default_prefix'], intents=intents, owner_id=int(config['government_structure']['supreme_ruler']))
+# Инициализация бота с поддержкой слэш-команд
+bot = commands.Bot(command_prefix=config['default_prefix'], intents=intents, owner_id=int(config['government_structure']['supreme_ruler']), help_command=None)
 bot.remove_command('help')
 
 # Глобальные переменные
 advertising_task = None
 current_government = config['government_structure']
+bot.config = config  # Добавляем конфигурацию как атрибут бота
 
-# Загрузка расширений (модулей)
-async def load_extensions(bot_instance):
-    extensions = [
-        'modules.moderation',
-        'modules.economy',
-        'modules.levels',
-        'modules.rpg',
-        'modules.star_wars',
-        'modules.help'
-    ]
-    
-    for extension in extensions:
-        try:
-            await bot_instance.load_extension(extension)
-            print(f"Загружено расширение: {extension}")
-        except Exception as e:
-            print(f"Ошибка при загрузке расширения {extension}: {e}")
+# Импорт модулей
+from modules.database import Database
+from modules.moderation import ModerationCog
+from modules.economy import EconomyCog
+from modules.levels import LevelsCog
+from modules.rpg import RPGCog
+from modules.star_wars import StarWarsCog
+from modules.help import HelpCog
+from modules.government import GovernmentCog
+
+# Глобальная переменная для базы данных
+db = Database()
+
+# Загрузка модулей
+async def load_cogs():
+    await bot.add_cog(ModerationCog(bot, db))
+    await bot.add_cog(EconomyCog(bot, db))
+    await bot.add_cog(LevelsCog(bot, db))
+    await bot.add_cog(RPGCog(bot, db))
+    await bot.add_cog(StarWarsCog(bot, db))
+    await bot.add_cog(HelpCog(bot))
+    await bot.add_cog(GovernmentCog(bot))
 
 @bot.event
 async def on_ready():
-    global advertising_task
     print(f'{bot.user} подключен к Discord!')
-    print(f'Бот находится в {len(bot.guilds)} серверах и обслуживает {len(bot.users)} пользователей')
+    print(f'Бот подключен к {len(bot.guilds)} серверам')
+    print(f'Служит {len(bot.users)} пользователям')
     
-    # Инициализация базы данных
-    from modules.database import init_db
-    await init_db()
+    # Синхронизация слэш-команд
+    try:
+        synced = await bot.tree.sync()
+        print(f"Синхронизировано {len(synced)} слэш-команд")
+    except Exception as e:
+        print(f"Ошибка при синхронизации слэш-команд: {e}")
+
+    # Загрузка модулей
+    await load_cogs()
     
-    # Установка активности
-    await bot.change_presence(activity=discord.Game(name="Galactic Empire Command"))
-    
-    # Запуск рекламной задачи если включена
-    if config.get('advertising_enabled', False):
-        start_advertising_task()
+    # Запуск задач
+    from modules.moderation import start_advertising_task
+    start_advertising_task(bot)
 
 @bot.event
 async def on_command_error(ctx, error):
@@ -576,15 +577,24 @@ async def change_government(ctx, action: str, target: str = None, user: discord.
     
     await ctx.send(embed=embed)
 
-if __name__ == "__main__":
-    # Запуск бота с токеном
+# Функция для запуска бота
+def run_bot():
+    print("Запуск бота...")
     try:
-        start_health_server()
-        print("Попытка запуска бота...")
         bot.run(BOT_TOKEN)
     except discord.LoginFailure:
-        print(f"Ошибка входа в Discord: токен из {token_source} ({len(BOT_TOKEN)} символов) отклонён. Сам токен не выводится.")
+        print("Ошибка: Неверный токен бота. Пожалуйста, проверьте значение токена в config.json или переменной окружения DISCORD_BOT_TOKEN.")
         exit(1)
     except Exception as e:
         print(f"Ошибка при запуске бота: {e}")
         exit(1)
+
+if __name__ == "__main__":
+    # Запуск бота с токеном
+    try:
+        print("Попытка запуска бота...")
+        run_bot()
+    except KeyboardInterrupt:
+        print("\nБот остановлен пользователем")
+    except Exception as e:
+        print(f"Критическая ошибка: {e}")
