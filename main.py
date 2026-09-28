@@ -89,6 +89,10 @@ config = load_config()
 # Получение токена из переменной окружения, если он не указан в config.json
 BOT_TOKEN = os.getenv('DISCORD_BOT_TOKEN', config.get('bot_token', ''))
 
+if not BOT_TOKEN:
+    print("Ошибка: Токен бота не найден! Установите переменную окружения DISCORD_BOT_TOKEN.")
+    exit(1)
+
 # Настройка интентов
 intents = discord.Intents.default()
 intents.message_content = True
@@ -535,16 +539,13 @@ async def change_government(ctx, action: str, target: str = None, user: discord.
     
     await ctx.send(embed=embed)
 
-def run_bot():
-    if not BOT_TOKEN:
-        raise RuntimeError("Ошибка: Токен бота не найден! Установите переменную окружения DISCORD_BOT_TOKEN.")
-    bot.run(BOT_TOKEN)
-
-
 if __name__ == "__main__":
     # Запуск бота с токеном из переменной окружения
     try:
-        run_bot()
-    except RuntimeError as exc:
-        print(exc)
-        raise SystemExit(1)
+        bot.run(BOT_TOKEN)
+    except discord.LoginFailure:
+        print("Ошибка: Неверный токен бота. Пожалуйста, проверьте значение переменной окружения DISCORD_BOT_TOKEN.")
+        exit(1)
+    except Exception as e:
+        print(f"Ошибка при запуске бота: {e}")
+        exit(1)
