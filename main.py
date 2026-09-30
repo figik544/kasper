@@ -7,9 +7,6 @@ import asyncio
 import aiosqlite
 import logging
 from enum import Enum
-from http.server import BaseHTTPRequestHandler
-from http.server import HTTPServer
-import threading
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -91,27 +88,6 @@ def resolve_bot_token(environment_token, config_token):
     return (environment_token or '').strip() or (config_token or '').strip()
 
 
-class HealthCheckHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        if self.path != '/':
-            self.send_error(404)
-            return
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b'OK')
-
-    def log_message(self, format, *args):
-        return
-
-
-def start_health_server():
-    port = os.getenv('PORT')
-    if not port:
-        return None
-
-    server = HTTPServer(('0.0.0.0', int(port)), HealthCheckHandler)
-    threading.Thread(target=server.serve_forever, daemon=True).start()
-    return server
 
 
 config = load_config()
@@ -259,9 +235,6 @@ async def on_command_error(ctx, error):
 # Функция для запуска бота
 def run_bot():
     print("Запуск бота...")
-    
-    # Запуск веб-сервера для health check
-    start_health_server()
     
     try:
         bot.run(BOT_TOKEN)
