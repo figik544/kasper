@@ -449,30 +449,28 @@ class ModerationCog(commands.Cog):
 
 # Функция для запуска задачи рекламы
 def start_advertising_task(bot):
-    global advertising_task
-    # Импортируем здесь, чтобы избежать циклических импортов
-    from modules.moderation import ModerationCog
-    
-    # Находим cog модерации
-    mod_cog = None
-    for cog in bot.cogs.values():
-        if isinstance(cog, ModerationCog):
-            mod_cog = cog
-            break
-    
-    if mod_cog and mod_cog.advertising_enabled:
-        @tasks.loop(hours=mod_cog.ad_frequency_hours)
+    """Запуск задачи рекламы"""
+    config = bot.config
+    if config.get('advertising_enabled', False):
+        @tasks.loop(hours=config.get('ad_frequency_hours', 6))
         async def advertise():
+            ad_message = config.get('ad_message', 'Присоединяйся к Федерации Галактической Империи!')
+            
+            embed = discord.Embed(
+                title="📢 Реклама Федерации",
+                description=ad_message,
+                color=0xFFD700
+            )
+            
             for guild in bot.guilds:
                 for channel in guild.text_channels:
                     if channel.permissions_for(guild.me).send_messages:
                         try:
-                            await channel.send(mod_cog.ad_message)
+                            await channel.send(embed=embed)
                             break  # Отправляем только в первый доступный канал
                         except:
                             continue
         
-        advertising_task = advertise
         advertise.start()
 
 async def setup(bot):
