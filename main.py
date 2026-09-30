@@ -143,7 +143,7 @@ def is_supreme_ruler(user_id):
     except:
         return False
 
-def is_chancellor_user(user_id):
+def is_chancellor(user_id):
     """Проверка, является ли пользователь канцлером"""
     try:
         with open('config.json', 'r', encoding='utf-8') as f:
@@ -191,7 +191,7 @@ async def on_message(message):
     if message.content.lower().strip() == 'сектор':
         # Определяем права пользователя
         is_supreme = is_supreme_ruler(message.author.id)
-        is_chancellor = is_chancellor_user(message.author.id)
+        is_chancellor_user = is_chancellor(message.author.id)
         is_admin = message.author.guild_permissions.administrator
 
         # Проверяем, есть ли пользователь в базе
@@ -249,7 +249,7 @@ async def on_message(message):
 - !revoke_emergency - Отменить чрезвычайное положение
 - !imperial_decree - Издать императорский указ
             """
-        elif is_chancellor or is_admin:
+        elif is_chancellor_user or is_admin:
             # Команды для канцлеров и администраторов
             commands_list = """
 **Доступные команды для администрации:**
@@ -305,8 +305,8 @@ async def on_message(message):
 
         embed = discord.Embed(
             title="🔒 Сектор - Имперский Центральный Командный Пункт",
-            description=f"Доступ ограничен. {'**Верховный Правитель Федерации Галактической Империи**' if is_supreme else ('**Канцлер**' if is_chancellor else '**Пользователь**')} может получить доступ к соответствующим командам." + commands_list,
-            color=0xFF0000 if is_supreme else (0x0000FF if is_chancellor or is_admin else 0x00FF00)
+            description=f"Доступ ограничен. {'**Верховный Правитель Федерации Галактической Империи**' if is_supreme else ('**Канцлер**' if is_chancellor_user else '**Пользователь**')} может получить доступ к соответствующим командам." + commands_list,
+            color=0xFF0000 if is_supreme else (0x0000FF if is_chancellor_user or is_admin else 0x00FF00)
         )
         try:
             await message.channel.send(embed=embed)
