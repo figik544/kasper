@@ -14,8 +14,33 @@ class HelpCog(commands.Cog):
             'star_wars': ['faction', 'imperial_motto', 'imperial_hierarchy', 'lightsaber_color', 'force_ability', 'galactic_fact', 'battle_simulator'],
             'government': ['set_supreme_ruler', 'add_chancellor', 'remove_chancellor', 'set_minister', 'remove_minister', 'gov_info', 'change_government'],
             'advertising': ['enable_ads', 'disable_ads', 'set_ad_message', 'ad_info'],
+            'security': ['activate_quarantine', 'deactivate_quarantine', 'quarantine_status', 'security_logs'],
             'other': ['about', 'setup_imperial_server']
         }
+
+    def is_supreme_ruler(self, user_id):
+        """Проверка, является ли пользователь верховным правителем"""
+        try:
+            with open('config.json', 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            return str(user_id) == config['government_structure']['supreme_ruler']
+        except:
+            return False
+
+    def is_chancellor_or_higher(self, ctx):
+        """Проверка, является ли пользователь канцлером или выше"""
+        try:
+            with open('config.json', 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            
+            user_id = str(ctx.author.id)
+            chancellors = config['government_structure']['chancellery']
+            is_chancellor = user_id in chancellors
+            is_supreme = user_id == config['government_structure']['supreme_ruler']
+            
+            return is_chancellor or is_supreme
+        except:
+            return False
 
     @commands.hybrid_command(name='help', description='Показывает список команд или информацию о конкретном модуле')
     @app_commands.describe(module_name='Название модуля для получения информации')
@@ -33,11 +58,12 @@ class HelpCog(commands.Cog):
         
         supreme_ruler_id = config['government_structure']['supreme_ruler']
         is_supreme_ruler = ctx.author.id == int(supreme_ruler_id)
+        is_admin = ctx.author.guild_permissions.administrator
+        is_chancellor = str(ctx.author.id) in config['government_structure']['chancellery']
         
         embed = discord.Embed(
             title="📚 Помощь - Галактический Имперский Бот",
-            description="Команды бота сгруппированы по категориям:" + 
-                       ("\n\n👑 **Вы являетесь Верховным Правителем Федерации Галактической Империи!**" if is_supreme_ruler else ""),
+            description="Команды бота сгруппированы по категориям:",
             color=0xFFD700
         )
 
@@ -53,20 +79,64 @@ class HelpCog(commands.Cog):
             inline=False
         )
 
-        for category, commands_list in self.categories.items():
-            if commands_list and category not in ['other', 'government', 'advertising']:  # Исключаем служебные категории
-                commands_str = ", ".join([f"`{cmd}`" for cmd in commands_list])
+        # Команды для обычных пользователей
+        user_commands = []
+        if 'economy' in self.categories:
+            user_commands.extend([f"`{cmd}`" for cmd in self.categories['economy']])
+        if 'levels' in self.categories:
+            user_commands.extend([f"`{cmd}`" for cmd in self.categories['levels']])
+        if 'rpg' in self.categories:
+            user_commands.extend([f"`{cmd}`" for cmd in self.categories['rpg']])
+        if 'star_wars' in self.categories:
+            user_commands.extend([f"`{cmd}`" for cmd in self.categories['star_wars']])
+        
+        if user_commands:
+            embed.add_field(
+                name="👤 Команды для обычных пользователей",
+                value=", ".join(user_commands),
+                inline=False
+            )
+
+        # Команды для администраторов
+        if is_admin or is_chancellor or is_supreme_ruler:
+            admin_commands = []
+            if 'moderation' in self.categories:
+                admin_commands.extend([f"`{cmd}`" for cmd in self.categories['moderation']])
+            if admin_commands:
                 embed.add_field(
-                    name=f"{category.title()}",
-                    value=commands_str,
+                    name="👮 Команды для администрации",
+                    value=", ".join(admin_commands),
                     inline=False
                 )
 
-        if is_supreme_ruler or ctx.author.guild_permissions.administrator:
-            admin_commands = ", ".join([f"`{cmd}`" for cmd in self.categories['government']])
+        # Команды для канцлеров
+        if is_chancellor or is_supreme_ruler:
+            chancellor_commands = []
+            if 'government' in self.categories:
+                chancellor_commands.extend([f"`{cmd}`" for cmd in self.categories['government']])
+            if chancellor_commands:
+                embed.add_field(
+                    name="🏛️ Команды для канцлеров",
+                    value=", ".join(chancellor_commands),
+                    inline=False
+                )
+
+        # Команды для верховного правителя
+        if is_supreme_ruler:
+            supreme_commands = []
+            if 'security' in self.categories:
+                supreme_commands.extend([f"`{cmd}`" for cmd in self.categories['security']])
+            if supreme_commands:
+                embed.add_field(
+                    name="👑 Команды для Верховного Правителя",
+                    value=", ".join(supreme_commands),
+                    inline=False
+                )
+            
             embed.add_field(
-                name="👑 Команды для администрации",
-                value=admin_commands,
+                name="ℹ️ Информация",
+                value="Вы являетесь **Верховным Правителем Федерации Галактической Империи!**\n"
+                      "Вам доступны все команды и функции бота.",
                 inline=False
             )
 
@@ -75,6 +145,30 @@ class HelpCog(commands.Cog):
 
     async def show_module_help(self, ctx, module_name):
         if module_name in self.categories:
+            # Определяем права пользователя
+            with open('config.json', 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            
+            is_supreme_ruler = ctx.author.id == int(config['government_structure']['supreme_ruler'])
+            is_admin = ctx.author.guild_permissions.administrator
+            is_chancellor = str(ctx.author.id) in config['government_structure']['chancellery']
+            
+            # Проверяем, имеет ли пользователь право видеть эту категорию
+            allowed_categories = ['economy', 'levels', 'rpg', 'star_wars', 'other']  # Все могут видеть
+            
+            if is_admin or is_chancellor or is_supreme_ruler:
+                allowed_categories.extend(['moderation'])
+            
+            if is_chancellor or is_supreme_ruler:
+                allowed_categories.extend(['government'])
+            
+            if is_supreme_ruler:
+                allowed_categories.extend(['security'])
+            
+            if module_name not in allowed_categories:
+                await ctx.send("❌ У вас нет прав для просмотра этой категории команд!")
+                return
+            
             commands_list = self.categories[module_name]
             commands_str = ", ".join([f"`{cmd}`" for cmd in commands_list])
             
@@ -84,14 +178,13 @@ class HelpCog(commands.Cog):
                 color=0xFFD700
             )
             
-            # Добавляем информацию о правах доступа для government команд
+            # Добавляем информацию о правах доступа для различных категорий
             if module_name == 'government':
                 embed.add_field(
                     name="Права доступа",
                     value="Команды правительства доступны:\n"
                           "- Владельцу бота\n"
-                          "- Верховному правителю (yochin0837)\n"
-                          "- Администраторам сервера\n"
+                          "- Верховному правителю\n"
                           "- Канцлерам правительства",
                     inline=False
                 )
@@ -100,7 +193,15 @@ class HelpCog(commands.Cog):
                     name="Права доступа",
                     value="Команды модерации доступны:\n"
                           "- Администраторам сервера\n"
-                          "- Верховному правителю (yochin0837)",
+                          "- Верховному правителю\n"
+                          "- Канцлерам правительства",
+                    inline=False
+                )
+            elif module_name == 'security':
+                embed.add_field(
+                    name="Права доступа",
+                    value="Команды безопасности доступны:\n"
+                          "- Только Верховному Правителю Федерации Галактической Империи",
                     inline=False
                 )
             elif module_name == 'economy':

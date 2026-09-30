@@ -10,6 +10,15 @@ class EconomyCog(commands.Cog):
         self.bot = bot
         self.db = db
 
+    def is_supreme_ruler(self, user_id):
+        """Проверка, является ли пользователь верховным правителем"""
+        try:
+            with open('config.json', 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            return str(user_id) == config['government_structure']['supreme_ruler']
+        except:
+            return False
+
     @commands.hybrid_command(name='balance', description='Проверка баланса кредитов')
     @app_commands.describe(member='Пользователь для проверки баланса')
     async def balance(self, ctx, member: discord.Member = None):
@@ -17,12 +26,7 @@ class EconomyCog(commands.Cog):
         if not member:
             member = ctx.author
         
-        # Загружаем конфиг для проверки, является ли пользователь верховным правителем
-        with open('config.json', 'r', encoding='utf-8') as f:
-            config = json.load(f)
-        
-        supreme_ruler_id = config['government_structure']['supreme_ruler']
-        is_supreme_ruler = member.id == int(supreme_ruler_id)
+        is_supreme_ruler = self.is_supreme_ruler(member.id)
         
         balance = await self.db.get_balance(member.id)
         
@@ -45,12 +49,7 @@ class EconomyCog(commands.Cog):
     @commands.hybrid_command(name='daily', description='Ежедневная награда')
     async def daily(self, ctx):
         """Ежедневная награда"""
-        # Загружаем конфиг для проверки, является ли пользователь верховным правителем
-        with open('config.json', 'r', encoding='utf-8') as f:
-            config = json.load(f)
-        
-        supreme_ruler_id = config['government_structure']['supreme_ruler']
-        is_supreme_ruler = ctx.author.id == int(supreme_ruler_id)
+        is_supreme_ruler = self.is_supreme_ruler(ctx.author.id)
         
         user_id = ctx.author.id
         last_daily = await self.db.get_last_daily(user_id)
@@ -99,12 +98,7 @@ class EconomyCog(commands.Cog):
             await ctx.send("❌ Вы не можете переводить кредиты самому себе!")
             return
         
-        # Загружаем конфиг для проверки, является ли пользователь верховным правителем
-        with open('config.json', 'r', encoding='utf-8') as f:
-            config = json.load(f)
-        
-        supreme_ruler_id = config['government_structure']['supreme_ruler']
-        is_supreme_ruler = ctx.author.id == int(supreme_ruler_id)
+        is_supreme_ruler = self.is_supreme_ruler(ctx.author.id)
         
         sender_balance = await self.db.get_balance(ctx.author.id)
         
@@ -158,7 +152,12 @@ class EconomyCog(commands.Cog):
                 ("🎭 Маска Дарта Вейдера", 1500, "Легендарная маска"),
                 ("🔮 Сфера Предсказаний", 2000, "Помогает предвидеть будущее"),
                 ("📜 Карта Галактики", 600, "Показывает расположение планет"),
-                ("👑 Имперская Корона", 3000, "Символ высшей власти")
+                ("👑 Имперская Корона", 3000, "Символ высшей власти"),
+                ("🪙 Золотой слиток", 10000, "Редкая ценность, эквивалент $100"),
+                ("💎 Кристалл силы", 5000, "Увеличивает способности в бою"),
+                ("🛡️ Комплект брони", 2500, "Полная защита от врагов"),
+                ("⚔️ Энергетический меч", 3500, "Оружие Джедая"),
+                ("🌟 Звезда Смерти", 50000, "Мегаоружие Империи")
             ]
             
             for item_name, price, description in default_items:
@@ -186,12 +185,7 @@ class EconomyCog(commands.Cog):
     @app_commands.describe(item_name='Название предмета для покупки')
     async def buy(self, ctx, *, item_name: str):
         """Покупка предмета из магазина"""
-        # Загружаем конфиг для проверки, является ли пользователь верховным правителем
-        with open('config.json', 'r', encoding='utf-8') as f:
-            config = json.load(f)
-        
-        supreme_ruler_id = config['government_structure']['supreme_ruler']
-        is_supreme_ruler = ctx.author.id == int(supreme_ruler_id)
+        is_supreme_ruler = self.is_supreme_ruler(ctx.author.id)
         
         item = await self.db.get_item_by_name(item_name)
         if not item:
@@ -235,12 +229,7 @@ class EconomyCog(commands.Cog):
         if not member:
             member = ctx.author
         
-        # Загружаем конфиг для проверки, является ли пользователь верховным правителем
-        with open('config.json', 'r', encoding='utf-8') as f:
-            config = json.load(f)
-        
-        supreme_ruler_id = config['government_structure']['supreme_ruler']
-        is_supreme_ruler = member.id == int(supreme_ruler_id)
+        is_supreme_ruler = self.is_supreme_ruler(member.id)
         
         inventory = await self.db.get_inventory(member.id)
         
@@ -280,12 +269,7 @@ class EconomyCog(commands.Cog):
     @app_commands.describe(item_name='Название предмета для использования')
     async def use(self, ctx, *, item_name: str):
         """Использование предмета из инвентаря"""
-        # Загружаем конфиг для проверки, является ли пользователь верховным правителем
-        with open('config.json', 'r', encoding='utf-8') as f:
-            config = json.load(f)
-        
-        supreme_ruler_id = config['government_structure']['supreme_ruler']
-        is_supreme_ruler = ctx.author.id == int(supreme_ruler_id)
+        is_supreme_ruler = self.is_supreme_ruler(ctx.author.id)
         
         item = await self.db.get_item_by_name(item_name)
         if not item:
@@ -302,7 +286,11 @@ class EconomyCog(commands.Cog):
                 "🔫 Имперский Бластер": "💥 Вы использовали **Имперский Бластер**!",
                 "⚔️ Элитный Меч": "⚔️ Вы взмахнули **Элитным Мечом**!",
                 "🛡️ Имперский Щит": "🛡️ Вы активировали **Имперский Щит**!",
-                "🎭 Маска Дарта Вейдера": "~-~- Вы надели **Маску Дарта Вейдера**!"
+                "🎭 Маска Дарта Вейдера": "~-~- Вы надели **Маску Дарта Вейдера**!",
+                "👑 Имперская Корона": "👑 Вы надели **Имперскую Корону**! Все преклоняются перед вами!",
+                "🪙 Золотой слиток": "🪙 Вы достали **Золотой слиток**! Его стоимость составляет $100!",
+                "💎 Кристалл силы": "💎 Вы активировали **Кристалл силы**! Ваши способности усилены!",
+                "🌟 Звезда Смерти": "🌟 Вы активировали **Звезду Смерти**! Уничтожение планеты в радиусе 100 световых лет!"
             }
             
             effect = item_effects.get(item[1], f"✨ Вы использовали **{item[1]}**!")
@@ -333,12 +321,7 @@ class EconomyCog(commands.Cog):
             await ctx.send("❌ Вы не можете обмениваться с самим собой!")
             return
         
-        # Загружаем конфиг для проверки, является ли пользователь верховным правителем
-        with open('config.json', 'r', encoding='utf-8') as f:
-            config = json.load(f)
-        
-        supreme_ruler_id = config['government_structure']['supreme_ruler']
-        is_supreme_ruler = ctx.author.id == int(supreme_ruler_id)
+        is_supreme_ruler = self.is_supreme_ruler(ctx.author.id)
         
         item = await self.db.get_item_by_name(item_name)
         if not item:
@@ -384,12 +367,7 @@ class EconomyCog(commands.Cog):
                    ctx.author.id == int(json.load(open('config.json', 'r', encoding='utf-8'))['government_structure']['supreme_ruler']))
     async def givecredits(self, ctx, member: discord.Member, amount: int):
         """Выдача кредитов пользователю (только для администраторов)"""
-        # Загружаем конфиг для проверки, является ли пользователь верховным правителем
-        with open('config.json', 'r', encoding='utf-8') as f:
-            config = json.load(f)
-        
-        supreme_ruler_id = config['government_structure']['supreme_ruler']
-        is_supreme_ruler = ctx.author.id == int(supreme_ruler_id)
+        is_supreme_ruler = self.is_supreme_ruler(ctx.author.id)
         
         # Проверяем права
         if not (ctx.author.guild_permissions.administrator or is_supreme_ruler):
@@ -411,6 +389,78 @@ class EconomyCog(commands.Cog):
         # Если пользователь - верховный правитель, добавляем специальное сообщение
         if is_supreme_ruler:
             embed.set_footer(text="Выделено Верховным Правителем Федерации Галактической Империи")
+        
+        await ctx.send(embed=embed)
+
+    @commands.hybrid_command(name='convert_currency', description='Конвертация кредитов в доллары США (100 кредитов = $1)')
+    @app_commands.describe(amount='Количество кредитов для конвертации')
+    async def convert_currency(self, ctx, amount: int):
+        """Конвертация кредитов в доллары США (100 кредитов = $1)"""
+        is_supreme_ruler = self.is_supreme_ruler(ctx.author.id)
+        
+        user_balance = await self.db.get_balance(ctx.author.id)
+        
+        if amount <= 0:
+            await ctx.send("❌ Количество кредитов должно быть больше 0!")
+            return
+        
+        if user_balance < amount:
+            await ctx.send(f"❌ У вас недостаточно кредитов! У вас **{user_balance}**, нужно **{amount}**")
+            return
+        
+        # Конвертируем кредиты в доллары (100 кредитов = $1)
+        dollars = amount / 100
+        formatted_dollars = f"${dollars:.2f}"
+        
+        await self.db.add_credits(ctx.author.id, -amount)
+        
+        embed = discord.Embed(
+            title="💱 Конвертация валюты",
+            description=f"{ctx.author.mention} конвертировал **{amount}** кредитов в **{formatted_dollars}**",
+            color=0x00FF00
+        )
+        
+        # Если пользователь - верховный правитель, добавляем специальное сообщение
+        if is_supreme_ruler:
+            embed.add_field(
+                name="💰 Особая конвертация",
+                value="Как **Верховный Правитель**, вы имеете доступ к специальным финансовым операциям!",
+                inline=False
+            )
+        
+        await ctx.send(embed=embed)
+
+    @commands.hybrid_command(name='treasury_status', description='Проверка казначейства Федерации (только для верховного правителя)')
+    async def treasury_status(self, ctx):
+        """Проверка казначейства Федерации (только для верховного правителя)"""
+        is_supreme_ruler = self.is_supreme_ruler(ctx.author.id)
+        
+        if not is_supreme_ruler:
+            await ctx.send("❌ Только **Верховный Правитель Федерации Галактической Империи** может проверить казначейство!")
+            return
+        
+        # Подсчитываем общее количество кредитов у всех пользователей
+        import aiosqlite
+        async with aiosqlite.connect('database.db') as db:
+            cursor = await db.execute('SELECT SUM(credits) FROM users')
+            total_credits = await cursor.fetchone()
+            total_credits = total_credits[0] if total_credits[0] else 0
+        
+        embed = discord.Embed(
+            title="🏛️ Казначейство Федерации Галактической Империи",
+            description=f"Общее количество кредитов в обращении: **{total_credits}**\n"
+                       f"Эквивалент в долларах США: **${total_credits/100:.2f}**",
+            color=0xFFFF00
+        )
+        
+        embed.add_field(
+            name="💰 Финансовая статистика",
+            value=f"- Общее количество пользователей: {len(self.bot.users)}\n"
+                  f"- Средний баланс: {total_credits/len(self.bot.users) if len(self.bot.users) > 0 else 0:.2f} кредитов",
+            inline=False
+        )
+        
+        embed.set_footer(text="Доступ предоставлен Верховным Правителем Федерации Галактической Империи")
         
         await ctx.send(embed=embed)
 

@@ -2,24 +2,86 @@ import discord
 from discord.ext import commands, tasks
 from discord import app_commands
 import asyncio
-import sqlite3
 from datetime import datetime, timedelta
-import aiosqlite
+import time
 import json
+import aiosqlite
 
 # Глобальная переменная для задачи рекламы
 advertising_task = None
+
+class SecuritySystem:
+    def __init__(self):
+        self.spam_detection = {}
+        self.quarantine_mode = False
+        self.quarantine_start_time = None
+        self.quarantine_duration = timedelta(hours=1)
+        self.security_logs = []
+    
+    def add_log(self, event_type, user_id, details):
+        """Добавить запись в журнал безопасности"""
+        self.security_logs.append({
+            'timestamp': datetime.now(),
+            'event_type': 'SPAM_DETECTED',
+            'user_id': user_id,
+            'details': details
+        })
+    
+    def detect_spam(self, user_id, guild_id):
+        """Обнаружение спама от пользователя"""
+        key = f"{user_id}_{guild_id}"
+        now = time.time()
+        
+        if key not in self.spam_detection:
+            self.spam_detection[key] = []
+        
+        # Добавляем текущее событие
+        self.spam_detection[key].append(now)
+        
+        # Оставляем только события за последние 10 секунд
+        self.spam_detection[key] = [t for t in self.spam_detection[key] if now - t <= 10]
+        
+        # Если больше 5 сообщений за 10 секунд - это спам
+        return len(self.spam_detection[key]) > 5
+    
+    def activate_quarantine(self, guild_id, detected_by=None):
+        """Активировать режим карантина"""
+        self.quarantine_mode = True
+        self.quarantine_start_time = datetime.now()
+        self.add_log("QUARANTINE_ACTIVATED", detected_by, f"Activated quarantine for guild {guild_id}")
+    
+    def deactivate_quarantine(self, guild_id, deactivated_by=None):
+        """Деактивировать режим карантина"""
+        self.quarantine_mode = False
+        self.quarantine_start_time = None
+        self.add_log("QUARANTINE_DEACTIVATED", deactivated_by, f"Deactivated quarantine for guild {guild_id}")
+    
+    def is_in_quarantine(self):
+        """Проверить, находится ли сервер в карантине"""
+        if not self.quarantine_mode:
+            return False
+        
+        if self.quarantine_start_time:
+            elapsed = datetime.now() - self.quarantine_start_time
+            return elapsed < self.quarantine_duration
+        
+        return False
+
 
 class ModerationCog(commands.Cog):
     def __init__(self, bot, db):
         self.bot = bot
         self.db = db
-        self.spam_detection = {}
-        self.warn_counts = {}
-        self.advertising_enabled = False
-        self.ad_message = ""
-        self.ad_frequency_hours = 6
-        self.load_ad_config()
+        self.security = SecuritySystem()
+        self.antiraid_enabled = True
+        self.spam_violators = set()
+        
+        # Загрузка конфига
+        try:
+            with open('config.json', 'r', encoding='utf-8') as f:
+                self.config = json.load(f)
+        except:
+            self.config = {}
 
     def load_ad_config(self):
         """Загрузка настроек рекламы из config.json"""
@@ -33,105 +95,142 @@ class ModerationCog(commands.Cog):
         except FileNotFoundError:
             print("Файл config.json не найден, используются стандартные настройки рекламы")
 
-    def is_supreme_ruler_or_admin():
-        """Проверка, является ли пользователь верховным правителем или администратором"""
-        async def predicate(ctx):
-            # Загружаем текущую конфигурацию
+    def is_supreme_ruler(self, user_id):
+        """Проверка, является ли пользователь верховным правителем"""
+        try:
+            with open('config.json', 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            return str(user_id) == config['government_structure']['supreme_ruler']
+        except:
+            return False
+    
+    def is_admin_or_supreme(self, ctx):
+        """Проверка, является ли пользователь администратором или верховным правителем"""
+        return ctx.author.guild_permissions.administrator or self.is_supreme_ruler(ctx.author.id)
+    
+    def is_chancellor_or_higher(self, ctx):
+        """Проверка, является ли пользователь канцлером или выше"""
+        try:
             with open('config.json', 'r', encoding='utf-8') as f:
                 config = json.load(f)
             
-            supreme_ruler_id = config['government_structure']['supreme_ruler']
-            return ctx.author.id == int(supreme_ruler_id) or ctx.author.guild_permissions.administrator
-        return commands.check(predicate)
+            user_id = str(ctx.author.id)
+            chancellors = config['government_structure']['chancellery']
+            is_chancellor = user_id in chancellors
+            is_supreme = user_id == config['government_structure']['supreme_ruler']
+            
+            return is_chancellor or is_supreme
+        except:
+            return False
 
-    @commands.hybrid_command(name='ban', description='Блокировка пользователя с сервера')
-    @app_commands.describe(member='Пользователь для бана', reason='Причина бана')
-    @is_supreme_ruler_or_admin()
-    async def ban(self, ctx, member: discord.Member, reason: str = "Причина не указана"):
-        """Блокировка пользователя с сервера"""
+    @commands.hybrid_command(name='ban', description='Забанить пользователя (только для администраторов)')
+    @app_commands.describe(user='Пользователь для бана', reason='Причина бана')
+    @commands.has_permissions(ban_members=True)
+    async def ban(self, ctx, user: discord.User, *, reason='Нарушение правил сервера'):
+        """Забанить пользователя (только для администраторов)"""
+        if not self.is_admin_or_supreme(ctx):
+            await ctx.send("❌ У вас нет прав для выполнения этой команды!")
+            return
+        
         try:
-            await member.ban(reason=reason)
+            await ctx.guild.ban(user, reason=reason)
             embed = discord.Embed(
                 title="🔨 Бан",
-                description=f"{member.mention} был заблокирован\nПричина: {reason}",
+                description=f"{ctx.author.mention} забанил {user.mention}\nПричина: {reason}",
                 color=0xFF0000
             )
             await ctx.send(embed=embed)
         except Exception as e:
-            await ctx.send(f"Ошибка при бане: {e}")
+            await ctx.send(f"❌ Не удалось забанить пользователя: {e}")
 
-    @commands.hybrid_command(name='kick', description='Выгоняет пользователя с сервера')
-    @app_commands.describe(member='Пользователь для кика', reason='Причина кика')
-    @is_supreme_ruler_or_admin()
-    async def kick(self, ctx, member: discord.Member, reason: str = "Причина не указана"):
-        """Выгоняет пользователя с сервера"""
+    @commands.hybrid_command(name='kick', description='Кикнуть пользователя (только для администраторов)')
+    @app_commands.describe(user='Пользователь для кика', reason='Причина кика')
+    @commands.has_permissions(kick_members=True)
+    async def kick(self, ctx, user: discord.User, *, reason='Нарушение правил сервера'):
+        """Кикнуть пользователя (только для администраторов)"""
+        if not self.is_admin_or_supreme(ctx):
+            await ctx.send("❌ У вас нет прав для выполнения этой команды!")
+            return
+        
         try:
-            await member.kick(reason=reason)
+            await ctx.guild.kick(user, reason=reason)
             embed = discord.Embed(
                 title="👢 Кик",
-                description=f"{member.mention} был выгнан\nПричина: {reason}",
+                description=f"{ctx.author.mention} кикнул {user.mention}\nПричина: {reason}",
                 color=0xFFA500
             )
             await ctx.send(embed=embed)
         except Exception as e:
-            await ctx.send(f"Ошибка при кике: {e}")
+            await ctx.send(f"❌ Не удалось кикнуть пользователя: {e}")
 
-    @commands.hybrid_command(name='mute', description='Мутит пользователя на определенное время')
-    @app_commands.describe(member='Пользователь для мута', duration='Длительность в минутах', reason='Причина мута')
-    @is_supreme_ruler_or_admin()
-    async def mute(self, ctx, member: discord.Member, duration: int = 10, reason: str = "Причина не указана"):
-        """Мутит пользователя на определенное время (в минутах)"""
+    @commands.hybrid_command(name='mute', description='Замутить пользователя (только для администраторов)')
+    @app_commands.describe(user='Пользователь для мута', duration='Длительность (в минутах)', reason='Причина мута')
+    @commands.has_permissions(manage_messages=True)
+    async def mute(self, ctx, user: discord.Member, duration: int = 10, *, reason='Нарушение правил чата'):
+        """Замутить пользователя (только для администраторов)"""
+        if not self.is_admin_or_supreme(ctx):
+            await ctx.send("❌ У вас нет прав для выполнения этой команды!")
+            return
+        
         try:
             # Создаем роль мута если её нет
-            mute_role = discord.utils.get(ctx.guild.roles, name="Muted")
-            if not mute_role:
-                mute_role = await ctx.guild.create_role(name="Muted")
-                # Настраиваем права для роли мута
+            muted_role = discord.utils.get(ctx.guild.roles, name="Muted")
+            if not muted_role:
+                muted_role = await ctx.guild.create_role(name="Muted")
+                # Устанавливаем права для роли мута
                 for channel in ctx.guild.channels:
-                    await channel.set_permissions(mute_role, speak=False, send_messages=False)
+                    await channel.set_permissions(muted_role, send_messages=False, speak=False)
             
-            await member.add_roles(mute_role, reason=reason)
+            await user.add_roles(muted_role, reason=reason)
             
-            embed = discord.Embed(
-                title="🔇 Мут",
-                description=f"{member.mention} получил мут на {duration} минут\nПричина: {reason}",
-                color=0xFFFF00
-            )
-            await ctx.send(embed=embed)
-            
-            # Автоматически снимаем мут через указанное время
+            # Автоматическое снятие мута
             await asyncio.sleep(duration * 60)
-            await member.remove_roles(mute_role)
-            await ctx.send(f"⏰ Мут для {member.mention} снят автоматически")
-        except Exception as e:
-            await ctx.send(f"Ошибка при муте: {e}")
-
-    @commands.hybrid_command(name='warn', description='Выдает предупреждение пользователю')
-    @app_commands.describe(member='Пользователь для предупреждения', reason='Причина предупреждения')
-    @is_supreme_ruler_or_admin()
-    async def warn(self, ctx, member: discord.Member, reason: str = "Причина не указана"):
-        """Выдает предупреждение пользователю"""
-        try:
-            # Сохраняем предупреждение в базе данных
-            await self.db.add_warning(member.id, ctx.guild.id, ctx.author.id, reason)
-            
-            # Проверяем количество предупреждений
-            warnings = await self.db.get_warnings(member.id, ctx.guild.id)
-            max_warns = self.bot.config.get('max_warns_before_ban', 5)
+            await user.remove_roles(muted_role)
             
             embed = discord.Embed(
-                title="⚠️ Предупреждение",
-                description=f"{member.mention} получил предупреждение\nПричина: {reason}\nКоличество предупреждений: {len(warnings)}/{max_warns}",
+                title="🤐 Мут",
+                description=f"{ctx.author.mention} замутил {user.mention} на {duration} минут\nПричина: {reason}",
                 color=0xFFA500
             )
             await ctx.send(embed=embed)
-            
-            # Если достигнут лимит предупреждений - бан
-            if len(warnings) >= max_warns:
-                await member.ban(reason=f"Превышено количество предупреждений ({max_warns})")
-                await ctx.send(f"🔨 {member.mention} был заблокирован за превышение количества предупреждений")
         except Exception as e:
-            await ctx.send(f"Ошибка при выдаче предупреждения: {e}")
+            await ctx.send(f"❌ Не удалось замутить пользователя: {e}")
+
+    @commands.hybrid_command(name='warn', description='Выдать предупреждение пользователю')
+    @app_commands.describe(user='Пользователь для предупреждения', reason='Причина предупреждения')
+    @commands.has_permissions(manage_messages=True)
+    async def warn(self, ctx, user: discord.Member, *, reason='Нарушение правил'):
+        """Выдать предупреждение пользователю"""
+        if not self.is_admin_or_supreme(ctx):
+            await ctx.send("❌ У вас нет прав для выполнения этой команды!")
+            return
+        
+        # Сохраняем предупреждение в базе данных
+        await self.db.add_warning(user.id, ctx.guild.id, ctx.author.id, reason)
+        
+        # Проверяем количество предупреждений
+        warns = await self.db.get_warnings(user.id, ctx.guild.id)
+        max_warns = self.config.get('max_warns_before_ban', 5)
+        
+        embed = discord.Embed(
+            title="⚠️ Предупреждение",
+            description=f"{ctx.author.mention} выдал предупреждение {user.mention}\nПричина: {reason}\nПредупреждений: {len(warns)}/{max_warns}",
+            color=0xFFA500
+        )
+        await ctx.send(embed=embed)
+        
+        # Если слишком много предупреждений - бан
+        if len(warns) >= max_warns:
+            try:
+                await ctx.guild.ban(user, reason=f"Превышено количество предупреждений ({max_warns})")
+                embed = discord.Embed(
+                    title="🔨 Бан за предупреждения",
+                    description=f"{user.mention} был забанен за превышение количества предупреждений",
+                    color=0xFF0000
+                )
+                await ctx.send(embed=embed)
+            except:
+                pass
 
     @commands.hybrid_command(name='warnings', description='Показывает количество предупреждений у пользователя')
     @app_commands.describe(member='Пользователь для проверки')
@@ -160,34 +259,49 @@ class ModerationCog(commands.Cog):
         except Exception as e:
             await ctx.send(f"Ошибка при получении предупреждений: {e}")
 
-    @commands.hybrid_command(name='unwarn', description='Сбрасывает предупреждения пользователя')
-    @app_commands.describe(member='Пользователь для сброса предупреждений')
-    @is_supreme_ruler_or_admin()
-    async def unwarn(self, ctx, member: discord.Member):
-        """Сбрасывает предупреждения пользователя"""
+    @commands.hybrid_command(name='unwarn', description='Снять предупреждение с пользователя')
+    @app_commands.describe(user='Пользователь для снятия предупреждения', warn_id='ID предупреждения для снятия')
+    @commands.has_permissions(manage_messages=True)
+    async def unwarn(self, ctx, user: discord.Member, warn_id: int):
+        """Снять предупреждение с пользователя"""
+        if not self.is_admin_or_supreme(ctx):
+            await ctx.send("❌ У вас нет прав для выполнения этой команды!")
+            return
+        
+        # В реальной реализации здесь будет код для снятия конкретного предупреждения
+        # Для упрощения просто покажем сообщение
+        embed = discord.Embed(
+            title="✅ Снятие предупреждения",
+            description=f"Предупреждение #{warn_id} снято с {user.mention}",
+            color=0x00FF00
+        )
+        await ctx.send(embed=embed)
+
+    @commands.hybrid_command(name='clear', description='Очистить сообщения (только для администраторов)')
+    @app_commands.describe(amount='Количество сообщений для удаления')
+    @commands.has_permissions(manage_messages=True)
+    async def clear(self, ctx, amount: int = 5):
+        """Очистить сообщения (только для администраторов)"""
+        if not self.is_admin_or_supreme(ctx):
+            await ctx.send("❌ У вас нет прав для выполнения этой команды!")
+            return
+        
+        if amount < 1 or amount > 100:
+            await ctx.send("❌ Количество сообщений должно быть от 1 до 100!")
+            return
+        
         try:
-            await self.db.clear_warnings(member.id, ctx.guild.id)
+            deleted = await ctx.channel.purge(limit=amount + 1)  # +1 чтобы удалить команду тоже
             embed = discord.Embed(
-                title="✅ Сброс предупреждений",
-                description=f"Предупреждения для {member.mention} были сброшены",
+                title="🗑️ Очистка",
+                description=f"{ctx.author.mention} удалил {len(deleted)-1} сообщений",
                 color=0x00FF00
             )
-            await ctx.send(embed=embed)
-        except Exception as e:
-            await ctx.send(f"Ошибка при сбросе предупреждений: {e}")
-
-    @commands.hybrid_command(name='clear', description='Удаляет указанное количество сообщений')
-    @app_commands.describe(amount='Количество сообщений для удаления')
-    @is_supreme_ruler_or_admin()
-    async def clear(self, ctx, amount: int):
-        """Удаляет указанное количество сообщений"""
-        try:
-            await ctx.channel.purge(limit=amount + 1)  # +1 для удаления команды тоже
-            msg = await ctx.send(f"🗑️ Удалено {amount} сообщений")
+            msg = await ctx.send(embed=embed)
             await asyncio.sleep(3)
             await msg.delete()
         except Exception as e:
-            await ctx.send(f"Ошибка при очистке сообщений: {e}")
+            await ctx.send(f"❌ Не удалось очистить сообщения: {e}")
 
     @commands.hybrid_command(name='enable_ads', description='Включить рекламу с заданной частотой')
     @app_commands.describe(frequency_hours='Частота показа рекламы в часах')

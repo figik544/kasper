@@ -5,9 +5,11 @@ services:
   region: frankfurt
   plan: free
   buildCommand: pip install -r requirements.txt
-  startCommand: python main.py
+  startCommand: python web_app.py
   envVars:
   - key: DISCORD_BOT_TOKEN
     sync: false
-  healthCheckPath: /
+  - key: SECRET_KEY
+    sync: false
+  healthCheckPath: /api/status
   healthCheckMaxRetries: 3

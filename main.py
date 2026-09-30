@@ -7,6 +7,9 @@ import asyncio
 import aiosqlite
 import logging
 from enum import Enum
+from http.server import BaseHTTPRequestHandler
+from http.server import HTTPServer
+import threading
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -130,6 +133,25 @@ from modules.government import GovernmentCog
 # Глобальная переменная для базы данных
 db = Database()
 
+# Функции проверки прав пользователя
+def is_supreme_ruler(user_id):
+    """Проверка, является ли пользователь верховным правителем"""
+    try:
+        with open('config.json', 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        return str(user_id) == config['government_structure']['supreme_ruler']
+    except:
+        return False
+
+def is_chancellor(user_id):
+    """Проверка, является ли пользователь канцлером"""
+    try:
+        with open('config.json', 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        return str(user_id) in config['government_structure']['chancellery']
+    except:
+        return False
+
 # Загрузка модулей
 async def load_cogs():
     await bot.add_cog(ModerationCog(bot, db))
@@ -162,54 +184,129 @@ async def on_ready():
 
 @bot.event
 async def on_message(message):
-    # Обработка команд
-    await bot.process_commands(message)
+    if message.author.bot:
+        return
     
     # Проверка на слово "сектор"
-    if message.content.lower().strip() == 'сектор' and not message.author.bot:
-        # Загружаем конфиг для проверки, является ли пользователь верховным правителем
-        with open('config.json', 'r', encoding='utf-8') as f:
-            config = json.load(f)
-        
-        supreme_ruler_id = config['government_structure']['supreme_ruler']
-        is_supreme_ruler = message.author.id == int(supreme_ruler_id)
-        
+    if message.content.lower().strip() == 'сектор':
+        # Определяем права пользователя
+        is_supreme = is_supreme_ruler(message.author.id)
+        is_chancellor = is_chancellor(message.author.id)
+        is_admin = message.author.guild_permissions.administrator
+
         # Проверяем, есть ли пользователь в базе
         user_data = await db.get_user_data(message.author.id)
         if not user_data:
             await db.create_user(message.author.id, message.guild.id)
         
-        # Отправляем ответ на слово "сектор"
-        if is_supreme_ruler:
-            embed = discord.Embed(
-                title="👑 Сектор - Имперский Центральный Командный Пункт",
-                description="**Верховный Правитель** активировал Имперский Центральный Командный Пункт!\n"
-                           "Все системы Федерации Галактической Империи находятся под вашим контролем.",
-                color=0xFFFF00
-            )
-            embed.add_field(
-                name="Доступные команды",
-                value="`!help` - Помощь по командам\n"
-                      "`!profile` - Ваш профиль\n"
-                      "`!gov_info` - Информация о правительстве\n"
-                      "`!balance` - Баланс кредитов",
-                inline=False
-            )
+        # Формируем доступные команды в зависимости от прав
+        if is_supreme:
+            # Команды для верховного правителя
+            commands_list = """
+**Доступные команды для Верховного Правителя:**
+- !help - Помощь по командам
+- !profile - Ваш профиль
+- !balance - Баланс кредитов
+- !daily - Ежедневная награда
+- !transfer - Перевод кредитов
+- !shop - Имперский рынок
+- !buy - Покупка предметов
+- !inventory - Инвентарь
+- !use - Использование предметов
+- !trade - Обмен предметами
+- !givecredits - Выдача кредитов
+- !convert_currency - Конвертация валюты
+- !treasury_status - Статус казначейства
+- !rankup - Повышение ранга
+- !leaderboard - Таблица лидеров
+- !setrank - Установка ранга
+- !xp_boost - Ускорение опыта
+- !level_stats - Статистика уровней
+- !ban - Бан пользователя
+- !kick - Кик пользователя
+- !mute - Мут пользователя
+- !warn - Предупреждение
+- !unwarn - Снятие предупреждения
+- !warnings - Просмотр предупреждений
+- !clear - Очистка сообщений
+- !set_supreme_ruler - Назначить верховного правителя
+- !add_chancellor - Добавить канцлера
+- !remove_chancellor - Удалить канцлера
+- !set_minister - Назначить министра
+- !remove_minister - Удалить министра
+- !gov_info - Информация о правительстве
+- !change_government - Изменить структуру правительства
+- !activate_quarantine - Активировать режим карантина
+- !deactivate_quarantine - Деактивировать режим карантина
+- !quarantine_status - Проверить статус карантина
+- !security_logs - Журнал безопасности
+- !declare_emergency - Объявить чрезвычайное положение
+- !revoke_emergency - Отменить чрезвычайное положение
+- !imperial_decree - Издать императорский указ
+            """
+        elif is_chancellor or is_admin:
+            # Команды для канцлеров и администраторов
+            commands_list = """
+**Доступные команды для администрации:**
+- !help - Помощь по командам
+- !profile - Ваш профиль
+- !balance - Баланс кредитов
+- !daily - Ежедневная награда
+- !transfer - Перевод кредитов
+- !shop - Имперский рынок
+- !buy - Покупка предметов
+- !inventory - Инвентарь
+- !use - Использование предметов
+- !trade - Обмен предметами
+- !rankup - Повышение ранга
+- !leaderboard - Таблица лидеров
+- !setrank - Установка ранга
+- !level_stats - Статистика уровней
+- !ban - Бан пользователя
+- !kick - Кик пользователя
+- !mute - Мут пользователя
+- !warn - Предупреждение
+- !unwarn - Снятие предупреждения
+- !warnings - Просмотр предупреждений
+- !clear - Очистка сообщений
+- !add_chancellor - Добавить канцлера
+- !remove_chancellor - Удалить канцлера
+- !set_minister - Назначить министра
+- !remove_minister - Удалить министра
+- !gov_info - Информация о правительстве
+- !change_government - Изменить структуру правительства
+- !activate_quarantine - Активировать режим карантина
+- !deactivate_quarantine - Деактивировать режим карантина
+- !quarantine_status - Проверить статус карантина
+            """
         else:
-            embed = discord.Embed(
-                title="🔒 Сектор - Имперский Центральный Командный Пункт",
-                description="Доступ ограничен. Только **Верховный Правитель** Федерации Галактической Империи может получить полный доступ к системе.",
-                color=0x00FFFF
-            )
-            embed.add_field(
-                name="Доступные команды",
-                value="`!help` - Помощь по командам\n"
-                      "`!profile` - Ваш профиль\n"
-                      "`!balance` - Баланс кредитов",
-                inline=False
-            )
-        
+            # Команды для обычных пользователей
+            commands_list = """
+**Доступные команды для пользователей:**
+- !help - Помощь по командам
+- !profile - Ваш профиль
+- !balance - Баланс кредитов
+- !daily - Ежедневная награда
+- !transfer - Перевод кредитов
+- !shop - Имперский рынок
+- !buy - Покупка предметов
+- !inventory - Инвентарь
+- !use - Использование предметов
+- !trade - Обмен предметами
+- !rankup - Повышение ранга
+- !leaderboard - Таблица лидеров
+- !level_stats - Статистика уровней
+            """
+
+        embed = discord.Embed(
+            title="🔒 Сектор - Имперский Центральный Командный Пункт",
+            description=f"Доступ ограничен. {'**Верховный Правитель Федерации Галактической Империи**' if is_supreme else ('**Канцлер**' if is_chancellor else '**Пользователь**')} может получить доступ к соответствующим командам." + commands_list,
+            color=0xFF0000 if is_supreme else (0x0000FF if is_chancellor or is_admin else 0x00FF00)
+        )
         await message.channel.send(embed=embed)
+        
+    # Обработка остальных сообщений
+    await bot.process_commands(message)
 
 @bot.event
 async def on_command_error(ctx, error):
@@ -232,9 +329,42 @@ async def on_command_error(ctx, error):
 # Они определены в модуле government.py как гибридные команды:
 # set_supreme_ruler, add_chancellor, remove_chancellor, set_minister, remove_minister, gov_info, change_government
 
+def start_health_server():
+    """Запуск веб-сервера для health check на Render"""
+    port = int(os.environ.get('PORT', 10000))
+    
+    class HealthCheckHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.path == '/':
+                self.send_response(200)
+                self.send_header('Content-type', 'text/html')
+                self.end_headers()
+                self.wfile.write(b'OK')
+            else:
+                self.send_response(404)
+                self.end_headers()
+        
+        def log_message(self, format, *args):
+            # Подавляем логи сервера
+            pass
+    
+    try:
+        server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
+        server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+        server_thread.start()
+        print(f"Health check сервер запущен на порту {port}")
+        return server
+    except Exception as e:
+        print(f"Ошибка при запуске health check сервера: {e}")
+        return None
+
+
 # Функция для запуска бота
 def run_bot():
     print("Запуск бота...")
+    
+    # Запуск веб-сервера для health check
+    start_health_server()
     
     try:
         bot.run(BOT_TOKEN)

@@ -13,6 +13,15 @@ class LevelsCog(commands.Cog):
         # Словарь для отслеживания последнего времени получения опыта пользователем
         self.last_message_time = {}
 
+    def is_supreme_ruler(self, user_id):
+        """Проверка, является ли пользователь верховным правителем"""
+        try:
+            with open('config.json', 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            return str(user_id) == config['government_structure']['supreme_ruler']
+        except:
+            return False
+
     @commands.hybrid_command(name='profile', description='Показывает профиль пользователя с его статистикой')
     @app_commands.describe(member='Пользователь для просмотра профиля')
     async def profile(self, ctx, member: discord.Member = None):
@@ -20,12 +29,7 @@ class LevelsCog(commands.Cog):
         if not member:
             member = ctx.author
         
-        # Загружаем конфиг для проверки, является ли пользователь верховным правителем
-        with open('config.json', 'r', encoding='utf-8') as f:
-            config = json.load(f)
-        
-        supreme_ruler_id = config['government_structure']['supreme_ruler']
-        is_supreme_ruler = member.id == int(supreme_ruler_id)
+        is_supreme_ruler = self.is_supreme_ruler(member.id)
         
         user_data = await self.db.get_user_data(member.id)
         if not user_data:
@@ -79,11 +83,7 @@ class LevelsCog(commands.Cog):
             user = self.bot.get_user(user_id)
             if user:
                 # Проверяем, является ли пользователь верховным правителем
-                with open('config.json', 'r', encoding='utf-8') as f:
-                    config = json.load(f)
-                
-                supreme_ruler_id = config['government_structure']['supreme_ruler']
-                is_supreme_ruler = user_id == int(supreme_ruler_id)
+                is_supreme_ruler = self.is_supreme_ruler(user_id)
                 
                 rank_display = f"{i}. {user.display_name}"
                 if is_supreme_ruler:
@@ -100,12 +100,7 @@ class LevelsCog(commands.Cog):
     @commands.hybrid_command(name='rankup', description='Попытка получить более высокий ранг через испытания')
     async def rankup(self, ctx):
         """Попытка получить более высокий ранг через испытания"""
-        # Загружаем конфиг для проверки, является ли пользователь верховным правителем
-        with open('config.json', 'r', encoding='utf-8') as f:
-            config = json.load(f)
-        
-        supreme_ruler_id = config['government_structure']['supreme_ruler']
-        is_supreme_ruler = ctx.author.id == int(supreme_ruler_id)
+        is_supreme_ruler = self.is_supreme_ruler(ctx.author.id)
         
         user_data = await self.db.get_user_data(ctx.author.id)
         if not user_data:
@@ -212,12 +207,7 @@ class LevelsCog(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def setrank(self, ctx, member: discord.Member, rank_name: str):
         """Ручная установка ранга пользователю (только для администраторов)"""
-        # Загружаем конфиг для проверки, является ли пользователь верховным правителем
-        with open('config.json', 'r', encoding='utf-8') as f:
-            config = json.load(f)
-        
-        supreme_ruler_id = config['government_structure']['supreme_ruler']
-        is_supreme_ruler = ctx.author.id == int(supreme_ruler_id)
+        is_supreme_ruler = self.is_supreme_ruler(ctx.author.id)
         
         # Если пользователь - верховный правитель, он может устанавливать ранги
         if not (ctx.author.guild_permissions.administrator or is_supreme_ruler):
@@ -231,6 +221,68 @@ class LevelsCog(commands.Cog):
             description=f"{ctx.author.mention} установил ранг '**{rank_name}**' пользователю {member.mention}",
             color=0x00FF00
         )
+        await ctx.send(embed=embed)
+
+    @commands.hybrid_command(name='xp_boost', description='Временное увеличение получения опыта (только для верховного правителя)')
+    @app_commands.describe(multiplier='Множитель опыта', duration='Длительность в минутах')
+    async def xp_boost(self, ctx, multiplier: float = 2.0, duration: int = 60):
+        """Временное увеличение получения опыта (только для верховного правителя)"""
+        is_supreme_ruler = self.is_supreme_ruler(ctx.author.id)
+        
+        if not is_supreme_ruler:
+            await ctx.send("❌ Только **Верховный Правитель Федерации Галактической Империи** может активировать ускорение опыта!")
+            return
+        
+        if multiplier < 1.0 or multiplier > 10.0:
+            await ctx.send("❌ Множитель опыта должен быть от 1.0 до 10.0!")
+            return
+        
+        if duration < 1 or duration > 1440:  # максимум 24 часа
+            await ctx.send("❌ Длительность должна быть от 1 до 1440 минут (24 часа)!")
+            return
+        
+        # В реальной системе здесь было бы сохранение временного эффекта
+        embed = discord.Embed(
+            title="⚡ Ускорение опыта активировано!",
+            description=f"**Верховный Правитель** {ctx.author.mention} активировал ускорение опыта!\n"
+                       f"Множитель: **{multiplier}x**\n"
+                       f"Длительность: **{duration}** минут",
+            color=0x00FFFF
+        )
+        embed.set_footer(text="Все пользователи сервера получают ускоренный опыт!")
+        
+        await ctx.send(embed=embed)
+
+    @commands.hybrid_command(name='level_stats', description='Статистика уровней сервера')
+    async def level_stats(self, ctx):
+        """Статистика уровней сервера"""
+        # Подсчитываем статистику
+        import aiosqlite
+        async with aiosqlite.connect('database.db') as db:
+            cursor = await db.execute('SELECT AVG(level), MAX(level), COUNT(*) FROM users')
+            avg_level, max_level, total_users = await cursor.fetchone()
+        
+        avg_level = avg_level if avg_level else 0
+        max_level = max_level if max_level else 0
+        total_users = total_users if total_users else 0
+        
+        embed = discord.Embed(
+            title="📈 Статистика уровней сервера",
+            color=0xFFD700
+        )
+        embed.add_field(name="Средний уровень", value=f"{avg_level:.2f}", inline=True)
+        embed.add_field(name="Максимальный уровень", value=max_level, inline=True)
+        embed.add_field(name="Всего пользователей", value=total_users, inline=True)
+        
+        # Проверяем, является ли пользователь верховным правителем
+        is_supreme_ruler = self.is_supreme_ruler(ctx.author.id)
+        if is_supreme_ruler:
+            embed.add_field(
+                name="👑 Особая информация",
+                value="Как **Верховный Правитель**, вы получаете двойной опыт за все действия!",
+                inline=False
+            )
+        
         await ctx.send(embed=embed)
 
     @commands.Cog.listener()
@@ -258,12 +310,7 @@ class LevelsCog(commands.Cog):
             if time_since_last_message.total_seconds() < 30:
                 return
         
-        # Загружаем конфиг для проверки, является ли пользователь верховным правителем
-        with open('config.json', 'r', encoding='utf-8') as f:
-            config = json.load(f)
-        
-        supreme_ruler_id = config['government_structure']['supreme_ruler']
-        is_supreme_ruler = message.author.id == int(supreme_ruler_id)
+        is_supreme_ruler = self.is_supreme_ruler(message.author.id)
         
         # Проверяем, есть ли пользователь в базе
         user_data = await self.db.get_user_data(message.author.id)

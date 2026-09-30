@@ -7,7 +7,16 @@ class GovernmentCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    def is_supreme_ruler_or_admin():
+    def is_supreme_ruler(self, user_id):
+        """Проверка, является ли пользователь верховным правителем"""
+        try:
+            with open('config.json', 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            return str(user_id) == config['government_structure']['supreme_ruler']
+        except:
+            return False
+
+    def is_supreme_ruler_or_admin(self):
         """Проверка, является ли пользователь верховным правителем или администратором"""
         async def predicate(ctx):
             # Загружаем текущую конфигурацию
@@ -15,7 +24,13 @@ class GovernmentCog(commands.Cog):
                 config = json.load(f)
             
             supreme_ruler_id = config['government_structure']['supreme_ruler']
-            return ctx.author.id == int(supreme_ruler_id) or ctx.author.guild_permissions.administrator
+            chancellors = config['government_structure']['chancellery']
+            
+            is_supreme = ctx.author.id == int(supreme_ruler_id)
+            is_chancellor = str(ctx.author.id) in chancellors
+            is_admin = ctx.author.guild_permissions.administrator
+            
+            return is_supreme or is_admin or is_chancellor
         return commands.check(predicate)
 
     @commands.hybrid_command(name='set_supreme_ruler', description='Установить верховного правителя (только для владельца бота)')
@@ -321,6 +336,55 @@ class GovernmentCog(commands.Cog):
         
         else:
             await ctx.send("❌ Недопустимое действие! Используйте: add_chancellor, remove_chancellor, set_minister, remove_minister")
+
+    @commands.hybrid_command(name='declare_emergency', description='Объявить чрезвычайное положение (только для верховного правителя)')
+    async def declare_emergency(self, ctx):
+        """Объявить чрезвычайное положение (только для верховного правителя)"""
+        if not self.is_supreme_ruler(ctx.author.id):
+            await ctx.send("❌ Только **Верховный Правитель Федерации Галактической Империи** может объявить чрезвычайное положение!")
+            return
+        
+        embed = discord.Embed(
+            title="🚨 ЧРЕЗВЫЧАЙНОЕ ПОЛОЖЕНИЕ ОБЪЯВЛЕНО!",
+            description=f"**Верховный Правитель** {ctx.author.mention} объявил чрезвычайное положение на территории Федерации Галактической Империи!\n\n"
+                       f"Все обычные ограничения на сервере временно отменены для обеспечения безопасности Империи.",
+            color=0xFF0000
+        )
+        embed.set_footer(text="Чрезвычайное положение будет действовать до отмены Верховным Правителем")
+        
+        await ctx.send(embed=embed)
+
+    @commands.hybrid_command(name='revoke_emergency', description='Отменить чрезвычайное положение (только для верховного правителя)')
+    async def revoke_emergency(self, ctx):
+        """Отменить чрезвычайное положение (только для верховного правителя)"""
+        if not self.is_supreme_ruler(ctx.author.id):
+            await ctx.send("❌ Только **Верховный Правитель Федерации Галактической Империи** может отменить чрезвычайное положение!")
+            return
+        
+        embed = discord.Embed(
+            title="✅ ЧРЕЗВЫЧАЙНОЕ ПОЛОЖЕНИЕ ОТМЕНЕНО",
+            description=f"**Верховный Правитель** {ctx.author.mention} отменил чрезвычайное положение на территории Федерации Галактической Империи!",
+            color=0x00FF00
+        )
+        
+        await ctx.send(embed=embed)
+
+    @commands.hybrid_command(name='imperial_decree', description='Издать императорский указ (только для верховного правителя)')
+    @app_commands.describe(decree_text='Текст указа')
+    async def imperial_decree(self, ctx, decree_text: str):
+        """Издать императорский указ (только для верховного правителя)"""
+        if not self.is_supreme_ruler(ctx.author.id):
+            await ctx.send("❌ Только **Верховный Правитель Федерации Галактической Империи** может издавать императорские указы!")
+            return
+        
+        embed = discord.Embed(
+            title="📜 ИМПЕРАТОРСКИЙ УКАЗ",
+            description=f"**Верховный Правитель** {ctx.author.mention} издал императорский указ:\n\n**{decree_text}**",
+            color=0x800080
+        )
+        embed.set_footer(text="Императорский указ вступает в силу немедленно")
+        
+        await ctx.send(embed=embed)
 
 async def setup(bot):
     await bot.add_cog(GovernmentCog(bot))
