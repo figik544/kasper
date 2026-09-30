@@ -186,8 +186,8 @@ async def on_ready():
 async def on_message(message):
     if message.author.bot:
         return
-    
-    # Проверка на слово "сектор"
+
+    # Проверка, является ли сообщение командой "сектор"
     if message.content.lower().strip() == 'сектор':
         # Определяем права пользователя
         is_supreme = is_supreme_ruler(message.author.id)
@@ -195,9 +195,14 @@ async def on_message(message):
         is_admin = message.author.guild_permissions.administrator
 
         # Проверяем, есть ли пользователь в базе
-        user_data = await db.get_user_data(message.author.id)
-        if not user_data:
-            await db.create_user(message.author.id, message.guild.id)
+        try:
+            user_data = await db.get_user_data(message.author.id)
+            if not user_data:
+                await db.create_user(message.author.id, message.guild.id)
+        except Exception as e:
+            print(f"Ошибка при работе с базой данных: {e}")
+            await message.channel.send("❌ Произошла ошибка при обработке запроса.")
+            return
         
         # Формируем доступные команды в зависимости от прав
         if is_supreme:
@@ -303,8 +308,11 @@ async def on_message(message):
             description=f"Доступ ограничен. {'**Верховный Правитель Федерации Галактической Империи**' if is_supreme else ('**Канцлер**' if is_chancellor else '**Пользователь**')} может получить доступ к соответствующим командам." + commands_list,
             color=0xFF0000 if is_supreme else (0x0000FF if is_chancellor or is_admin else 0x00FF00)
         )
-        await message.channel.send(embed=embed)
-        
+        try:
+            await message.channel.send(embed=embed)
+        except Exception as e:
+            print(f"Ошибка при отправке сообщения: {e}")
+    
     # Обработка остальных сообщений
     await bot.process_commands(message)
 
