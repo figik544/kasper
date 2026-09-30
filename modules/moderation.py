@@ -22,7 +22,7 @@ class SecuritySystem:
         """Добавить запись в журнал безопасности"""
         self.security_logs.append({
             'timestamp': datetime.now(),
-            'event_type': 'SPAM_DETECTED',
+            'event_type': event_type,
             'user_id': user_id,
             'details': details
         })
