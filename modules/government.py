@@ -16,22 +16,20 @@ class GovernmentCog(commands.Cog):
         except:
             return False
 
-    def is_supreme_ruler_or_admin(self):
+    def is_supreme_ruler_or_admin(self, ctx):
         """Проверка, является ли пользователь верховным правителем или администратором"""
-        async def predicate(ctx):
-            # Загружаем текущую конфигурацию
-            with open('config.json', 'r', encoding='utf-8') as f:
-                config = json.load(f)
-            
-            supreme_ruler_id = config['government_structure']['supreme_ruler']
-            chancellors = config['government_structure']['chancellery']
-            
-            is_supreme = ctx.author.id == int(supreme_ruler_id)
-            is_chancellor = str(ctx.author.id) in chancellors
-            is_admin = ctx.author.guild_permissions.administrator
-            
-            return is_supreme or is_admin or is_chancellor
-        return commands.check(predicate)
+        # Загружаем текущую конфигурацию
+        with open('config.json', 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        supreme_ruler_id = config['government_structure']['supreme_ruler']
+        chancellors = config['government_structure']['chancellery']
+        
+        is_supreme = ctx.author.id == int(supreme_ruler_id)
+        is_chancellor = str(ctx.author.id) in chancellors
+        is_admin = ctx.author.guild_permissions.administrator
+        
+        return is_supreme or is_admin or is_chancellor
 
     @commands.hybrid_command(name='set_supreme_ruler', description='Установить верховного правителя (только для владельца бота)')
     @app_commands.describe(user='Пользователь для назначения верховным правителем')
@@ -58,7 +56,6 @@ class GovernmentCog(commands.Cog):
 
     @commands.hybrid_command(name='add_chancellor', description='Добавить канцлера в правительство')
     @app_commands.describe(user='Пользователь для назначения канцлером')
-    @is_supreme_ruler_or_admin()
     async def add_chancellor(self, ctx, user: discord.User):
         """Добавить канцлера в правительство"""
         # Загружаем текущую конфигурацию
@@ -87,7 +84,6 @@ class GovernmentCog(commands.Cog):
 
     @commands.hybrid_command(name='remove_chancellor', description='Удалить канцлера из правительства')
     @app_commands.describe(user='Пользователь для удаления из канцлеров')
-    @is_supreme_ruler_or_admin()
     async def remove_chancellor(self, ctx, user: discord.User):
         """Удалить канцлера из правительства"""
         # Загружаем текущую конфигурацию
@@ -115,7 +111,6 @@ class GovernmentCog(commands.Cog):
 
     @commands.hybrid_command(name='set_minister', description='Назначить министра в ведомство')
     @app_commands.describe(ministry='Название ведомства', user='Пользователь для назначения министром')
-    @is_supreme_ruler_or_admin()
     async def set_minister(self, ctx, ministry: str, user: discord.User):
         """Назначить министра в ведомство"""
         # Загружаем текущую конфигурацию
@@ -139,7 +134,6 @@ class GovernmentCog(commands.Cog):
 
     @commands.hybrid_command(name='remove_minister', description='Удалить министра из ведомства')
     @app_commands.describe(ministry='Название ведомства')
-    @is_supreme_ruler_or_admin()
     async def remove_minister(self, ctx, ministry: str):
         """Удалить министра из ведомства"""
         # Загружаем текущую конфигурацию
@@ -232,7 +226,6 @@ class GovernmentCog(commands.Cog):
 
     @commands.hybrid_command(name='change_government', description='Команда для изменения структуры правительства')
     @app_commands.describe(action='Действие с правительством', target='Цель действия', user='Пользователь')
-    @is_supreme_ruler_or_admin()
     async def change_government(self, ctx, action: str, target: str = None, user: discord.User = None):
         """Команда для изменения структуры правительства (владелец, верховный правитель и канцлеры)"""
         # Загружаем текущую конфигурацию
