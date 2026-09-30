@@ -10,6 +10,8 @@ class LevelsCog(commands.Cog):
     def __init__(self, bot, db):
         self.bot = bot
         self.db = db
+        # Словарь для отслеживания последнего времени получения опыта пользователем
+        self.last_message_time = {}
 
     @commands.hybrid_command(name='profile', description='Показывает профиль пользователя с его статистикой')
     @app_commands.describe(member='Пользователь для просмотра профиля')
@@ -52,7 +54,7 @@ class LevelsCog(commands.Cog):
         
         # Если пользователь - верховный правитель, добавляем специальное поле
         if is_supreme_ruler:
-            embed.add_field(name="Статус", value="👑 Верховный Правитель Федерации Галактической Империи", inline=False)
+            embed.add_field(name="Статус", value="👑 **Верховный Правитель Федерации Галактической Империи**", inline=False)
             embed.color = 0xFFFF00  # Жёлтый цвет для верховного правителя
         
         await ctx.send(embed=embed)
@@ -135,7 +137,7 @@ class LevelsCog(commands.Cog):
             
             embed = discord.Embed(
                 title="🎖️ Повышение!",
-                description=f"@{ctx.author.display_name}, как Верховный Правитель, вы были произведены в {next_rank}!",
+                description=f"@{ctx.author.display_name}, как **Верховный Правитель**, вы были произведены в **{next_rank}**!",
                 color=0x00FF00
             )
             await ctx.send(embed=embed)
@@ -146,10 +148,11 @@ class LevelsCog(commands.Cog):
             
             reward_embed = discord.Embed(
                 title="💰 Награда за повышение",
-                description=f"Вы получили {reward} кредитов за продвижение до {next_rank}!",
+                description=f"Вы получили **{reward}** кредитов за продвижение до **{next_rank}**!",
                 color=0x00FF00
             )
             await ctx.send(embed=reward_embed)
+            
             return
         
         # Определяем следующий возможный ранг
@@ -176,7 +179,7 @@ class LevelsCog(commands.Cog):
             
             embed = discord.Embed(
                 title="🎖️ Повышение!",
-                description=f"@{ctx.author.display_name}, ваша преданность была отмечена. Вы были произведены в {next_rank}!",
+                description=f"@{ctx.author.display_name}, ваша **преданность** была отмечена. Вы были произведены в **{next_rank}**!",
                 color=0x00FF00
             )
             await ctx.send(embed=embed)
@@ -187,7 +190,7 @@ class LevelsCog(commands.Cog):
             
             reward_embed = discord.Embed(
                 title="💰 Награда за повышение",
-                description=f"Вы получили {reward} кредитов за продвижение до {next_rank}!",
+                description=f"Вы получили **{reward}** кредитов за продвижение до **{next_rank}**!",
                 color=0x00FF00
             )
             await ctx.send(embed=reward_embed)
@@ -197,9 +200,9 @@ class LevelsCog(commands.Cog):
             
             embed = discord.Embed(
                 title="⏳ Повышение",
-                description=f"Для получения ранга {next_rank} требуется уровень {required_level}.\n"
-                           f"Ваш текущий уровень: {current_level}\n"
-                           f"Необходимо опыта: {required_xp - current_xp}",
+                description=f"Для получения ранга **{next_rank}** требуется уровень **{required_level}**.\n"
+                           f"Ваш текущий уровень: **{current_level}**\n"
+                           f"Необходимо опыта: **{required_xp - current_xp}**",
                 color=0xFFA500
             )
             await ctx.send(embed=embed)
@@ -225,7 +228,7 @@ class LevelsCog(commands.Cog):
         
         embed = discord.Embed(
             title="⚙️ Установка ранга",
-            description=f"{ctx.author.mention} установил ранг '{rank_name}' пользователю {member.mention}",
+            description=f"{ctx.author.mention} установил ранг '**{rank_name}**' пользователю {member.mention}",
             color=0x00FF00
         )
         await ctx.send(embed=embed)
@@ -238,6 +241,22 @@ class LevelsCog(commands.Cog):
         
         if message.guild is None:  # не в приватных сообщениях
             return
+        
+        # Проверяем, является ли сообщение командой
+        if message.content.startswith(tuple(self.bot.command_prefix)):
+            return
+        
+        # Проверяем, является ли сообщение словом "сектор"
+        if message.content.lower().strip() == 'сектор':
+            return  # Не начисляем опыт за команду "сектор"
+        
+        # Проверяем время последнего сообщения от пользователя
+        current_time = datetime.now()
+        if message.author.id in self.last_message_time:
+            time_since_last_message = current_time - self.last_message_time[message.author.id]
+            # Если прошло меньше 30 секунд, не начисляем опыт
+            if time_since_last_message.total_seconds() < 30:
+                return
         
         # Загружаем конфиг для проверки, является ли пользователь верховным правителем
         with open('config.json', 'r', encoding='utf-8') as f:
@@ -262,6 +281,9 @@ class LevelsCog(commands.Cog):
         
         await self.db.add_xp(message.author.id, xp_gain)
         
+        # Обновляем время последнего сообщения
+        self.last_message_time[message.author.id] = current_time
+        
         # Проверяем, повысился ли уровень
         user_data = await self.db.get_user_data(message.author.id)
         level = user_data[3]
@@ -279,7 +301,7 @@ class LevelsCog(commands.Cog):
             
             embed = discord.Embed(
                 title="📈 Повышение уровня!",
-                description=f"{message.author.mention}, поздравляем! Вы достигли уровня {new_level}!",
+                description=f"{message.author.mention}, поздравляем! Вы достигли **уровня {new_level}**!",
                 color=0x00FF00
             )
             
@@ -287,7 +309,7 @@ class LevelsCog(commands.Cog):
             if is_supreme_ruler:
                 embed.add_field(
                     name="Специальная награда",
-                    value="Как Верховный Правитель, вы получаете двойной опыт!",
+                    value="Как **Верховный Правитель**, вы получаете двойной опыт!",
                     inline=False
                 )
             
@@ -312,7 +334,7 @@ class LevelsCog(commands.Cog):
                         
                         embed.add_field(
                             name="🎖️ Новый ранг",
-                            value=f"Вы были произведены в звание: {new_rank}",
+                            value=f"Вы были произведены в звание: **{new_rank}**",
                             inline=False
                         )
             

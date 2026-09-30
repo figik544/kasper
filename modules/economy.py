@@ -28,7 +28,7 @@ class EconomyCog(commands.Cog):
         
         embed = discord.Embed(
             title=f"💰 Баланс {member.display_name}",
-            description=f"Кредитов: {balance}",
+            description=f"Кредитов: **{balance}**",
             color=0x00FF00
         )
         
@@ -36,7 +36,7 @@ class EconomyCog(commands.Cog):
         if is_supreme_ruler:
             embed.add_field(
                 name="Статус",
-                value="👑 Верховный Правитель Федерации Галактической Империи",
+                value="👑 **Верховный Правитель Федерации Галактической Империи**",
                 inline=False
             )
         
@@ -66,7 +66,7 @@ class EconomyCog(commands.Cog):
                 
                 embed = discord.Embed(
                     title="⏳ Ежедневная награда",
-                    description=f"Вы уже получали ежедневную награду!\nСледующая награда через: {hours}ч {minutes}м",
+                    description=f"Вы уже получали ежедневную награду!\nСледующая награда через: **{hours}ч {minutes}м**",
                     color=0xFFA500
                 )
                 await ctx.send(embed=embed)
@@ -86,7 +86,7 @@ class EconomyCog(commands.Cog):
         
         embed = discord.Embed(
             title="🎁 Ежедневная награда",
-            description=f"Вы получили {reward} кредитов!" + (" (Бонус для Верховного Правителя!)" if is_supreme_ruler else ""),
+            description=f"Вы получили **{reward}** кредитов!" + (" (Бонус для **Верховного Правителя**!)" if is_supreme_ruler else ""),
             color=0x00FF00
         )
         await ctx.send(embed=embed)
@@ -116,8 +116,8 @@ class EconomyCog(commands.Cog):
             await self.db.add_credits(member.id, amount)
             
             embed = discord.Embed(
-                title="💸 Перевод (Специальная транзакция)",
-                description=f"{ctx.author.mention} (Верховный Правитель) перевел {amount} кредитов {member.mention}",
+                title="💸 Специальный перевод",
+                description=f"**Верховный Правитель** {ctx.author.mention} перевел **{amount}** кредитов {member.mention}",
                 color=0xFFD700
             )
             await ctx.send(embed=embed)
@@ -136,7 +136,7 @@ class EconomyCog(commands.Cog):
         
         embed = discord.Embed(
             title="💸 Перевод",
-            description=f"{ctx.author.mention} перевел {amount} кредитов {member.mention}",
+            description=f"{ctx.author.mention} перевел **{amount}** кредитов {member.mention}",
             color=0x00FF00
         )
         await ctx.send(embed=embed)
@@ -168,13 +168,13 @@ class EconomyCog(commands.Cog):
         
         embed = discord.Embed(
             title="🛒 Имперский Рынок",
-            description="Добро пожаловать на Имперский Рынок! Здесь вы можете приобрести различные товары за кредиты.",
+            description="Добро пожаловать на **Имперский Рынок**! Здесь вы можете приобрести различные товары за кредиты.",
             color=0xFFD700
         )
         
         for item in items:
             embed.add_field(
-                name=f"{item[1]} - {item[2]} кредитов",
+                name=f"{item[1]} - **{item[2]}** кредитов",
                 value=item[3],
                 inline=False
             )
@@ -205,8 +205,8 @@ class EconomyCog(commands.Cog):
             await self.db.add_item_to_inventory(ctx.author.id, item[0])  # item[0] - это id предмета
             
             embed = discord.Embed(
-                title="👑 Покупка (Специальная транзакция)",
-                description=f"Верховный Правитель {ctx.author.mention} получил {item[1]} бесплатно!",
+                title="👑 Специальная покупка",
+                description=f"**Верховный Правитель** {ctx.author.mention} получил **{item[1]}** бесплатно!",
                 color=0xFFFF00
             )
             await ctx.send(embed=embed)
@@ -215,7 +215,7 @@ class EconomyCog(commands.Cog):
         user_balance = await self.db.get_balance(ctx.author.id)
         
         if user_balance < price:
-            await ctx.send(f"❌ У вас недостаточно кредитов! Необходимо {price}, у вас {user_balance}")
+            await ctx.send(f"❌ У вас недостаточно кредитов! Необходимо **{price}**, у вас **{user_balance}**")
             return
         
         await self.db.add_credits(ctx.author.id, -price)
@@ -223,7 +223,7 @@ class EconomyCog(commands.Cog):
         
         embed = discord.Embed(
             title="✅ Покупка успешна",
-            description=f"Вы купили {item[1]} за {price} кредитов!",
+            description=f"Вы купили **{item[1]}** за **{price}** кредитов!",
             color=0x00FF00
         )
         await ctx.send(embed=embed)
@@ -261,7 +261,7 @@ class EconomyCog(commands.Cog):
                 item_details = await self.db.get_item_by_id(item[1])  # item[1] - это item_id
                 if item_details:
                     embed.add_field(
-                        name=item_details[1],  # название предмета
+                        name=f"**{item_details[1]}**",  # название предмета
                         value=item_details[3],  # описание предмета
                         inline=False
                     )
@@ -270,7 +270,7 @@ class EconomyCog(commands.Cog):
         if is_supreme_ruler:
             embed.add_field(
                 name="Статус",
-                value="👑 Верховный Правитель Федерации Галактической Империи",
+                value="👑 **Верховный Правитель Федерации Галактической Империи**",
                 inline=False
             )
         
@@ -299,13 +299,13 @@ class EconomyCog(commands.Cog):
         if is_supreme_ruler or item_exists:
             # В зависимости от типа предмета выполняем разные действия
             item_effects = {
-                "🔫 Имперский Бластер": "💥 Вы использовали Имперский Бластер!",
-                "⚔️ Элитный Меч": "⚔️ Вы взмахнули Элитным Мечом!",
-                "🛡️ Имперский Щит": "🛡️ Вы активировали Имперский Щит!",
-                "🎭 Маска Дарта Вейдера": "~-~- Вы надели Маску Дарта Вейдера!"
+                "🔫 Имперский Бластер": "💥 Вы использовали **Имперский Бластер**!",
+                "⚔️ Элитный Меч": "⚔️ Вы взмахнули **Элитным Мечом**!",
+                "🛡️ Имперский Щит": "🛡️ Вы активировали **Имперский Щит**!",
+                "🎭 Маска Дарта Вейдера": "~-~- Вы надели **Маску Дарта Вейдера**!"
             }
             
-            effect = item_effects.get(item[1], f"✨ Вы использовали {item[1]}!")
+            effect = item_effects.get(item[1], f"✨ Вы использовали **{item[1]}**!")
             
             embed = discord.Embed(
                 title="✨ Использование предмета",
@@ -317,7 +317,7 @@ class EconomyCog(commands.Cog):
             if is_supreme_ruler:
                 embed.add_field(
                     name="Специальное использование",
-                    value="Как Верховный Правитель, вы можете использовать любой предмет!",
+                    value="Как **Верховный Правитель**, вы можете использовать любой предмет!",
                     inline=False
                 )
             
@@ -355,15 +355,15 @@ class EconomyCog(commands.Cog):
                 await self.db.add_item_to_inventory(member.id, item[0])
             
             embed = discord.Embed(
-                title="🔄 Обмен (Специальная транзакция)",
-                description=f"Верховный Правитель {ctx.author.mention} передал {quantity} шт. {item[1]} пользователю {member.mention}",
+                title="🔄 Специальный обмен",
+                description=f"**Верховный Правитель** {ctx.author.mention} передал **{quantity} шт.** {item[1]} пользователю {member.mention}",
                 color=0xFFD700
             )
             await ctx.send(embed=embed)
             return
         
         if user_item_count < quantity:
-            await ctx.send(f"❌ У вас недостаточно предметов '{item_name}'! У вас {user_item_count}, нужно {quantity}")
+            await ctx.send(f"❌ У вас недостаточно предметов '{item_name}'! У вас **{user_item_count}**, нужно **{quantity}**")
             return
         
         # Удаляем предметы у отправителя и добавляем получателю
@@ -373,7 +373,7 @@ class EconomyCog(commands.Cog):
         
         embed = discord.Embed(
             title="🔄 Обмен",
-            description=f"{ctx.author.mention} передал {quantity} шт. {item[1]} пользователю {member.mention}",
+            description=f"{ctx.author.mention} передал **{quantity} шт.** {item[1]} пользователю {member.mention}",
             color=0x00FF00
         )
         await ctx.send(embed=embed)
@@ -404,7 +404,7 @@ class EconomyCog(commands.Cog):
         
         embed = discord.Embed(
             title="💳 Выдача кредитов",
-            description=f"{ctx.author.mention} выдал {amount} кредитов пользователю {member.mention}",
+            description=f"{ctx.author.mention} выдал **{amount}** кредитов пользователю {member.mention}",
             color=0x00FF00
         )
         

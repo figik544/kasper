@@ -15,4 +15,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-CMD ["python", "main.py"]
+# Установка порта по умолчанию
+ENV PORT=10000
+
+# Запуск веб-приложения
+CMD ["python", "web_app.py"]

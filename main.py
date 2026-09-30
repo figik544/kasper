@@ -185,6 +185,57 @@ async def on_ready():
     start_advertising_task(bot)
 
 @bot.event
+async def on_message(message):
+    # Обработка команд
+    await bot.process_commands(message)
+    
+    # Проверка на слово "сектор"
+    if message.content.lower().strip() == 'сектор' and not message.author.bot:
+        # Загружаем конфиг для проверки, является ли пользователь верховным правителем
+        with open('config.json', 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        supreme_ruler_id = config['government_structure']['supreme_ruler']
+        is_supreme_ruler = message.author.id == int(supreme_ruler_id)
+        
+        # Проверяем, есть ли пользователь в базе
+        user_data = await db.get_user_data(message.author.id)
+        if not user_data:
+            await db.create_user(message.author.id, message.guild.id)
+        
+        # Отправляем ответ на слово "сектор"
+        if is_supreme_ruler:
+            embed = discord.Embed(
+                title="👑 Сектор - Имперский Центральный Командный Пункт",
+                description="**Верховный Правитель** активировал Имперский Центральный Командный Пункт!\n"
+                           "Все системы Федерации Галактической Империи находятся под вашим контролем.",
+                color=0xFFFF00
+            )
+            embed.add_field(
+                name="Доступные команды",
+                value="`!help` - Помощь по командам\n"
+                      "`!profile` - Ваш профиль\n"
+                      "`!gov_info` - Информация о правительстве\n"
+                      "`!balance` - Баланс кредитов",
+                inline=False
+            )
+        else:
+            embed = discord.Embed(
+                title="🔒 Сектор - Имперский Центральный Командный Пункт",
+                description="Доступ ограничен. Только **Верховный Правитель** Федерации Галактической Империи может получить полный доступ к системе.",
+                color=0x00FFFF
+            )
+            embed.add_field(
+                name="Доступные команды",
+                value="`!help` - Помощь по командам\n"
+                      "`!profile` - Ваш профиль\n"
+                      "`!balance` - Баланс кредитов",
+                inline=False
+            )
+        
+        await message.channel.send(embed=embed)
+
+@bot.event
 async def on_command_error(ctx, error):
     if isinstance(error, commands.CommandNotFound):
         embed = discord.Embed(
@@ -208,6 +259,10 @@ async def on_command_error(ctx, error):
 # Функция для запуска бота
 def run_bot():
     print("Запуск бота...")
+    
+    # Запуск веб-сервера для health check
+    start_health_server()
+    
     try:
         bot.run(BOT_TOKEN)
     except discord.LoginFailure:

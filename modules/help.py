@@ -37,18 +37,38 @@ class HelpCog(commands.Cog):
         embed = discord.Embed(
             title="📚 Помощь - Галактический Имперский Бот",
             description="Команды бота сгруппированы по категориям:" + 
-                       ("\n\n👑 Вы являетесь Верховным Правителем Федерации Галактической Империи!" if is_supreme_ruler else ""),
+                       ("\n\n👑 **Вы являетесь Верховным Правителем Федерации Галактической Империи!**" if is_supreme_ruler else ""),
             color=0xFFD700
         )
 
+        # Основные команды для обычных пользователей
+        embed.add_field(
+            name="🚀 Основные команды для пользователей",
+            value="`!profile` - Посмотреть свой профиль\n"
+                  "`!balance` - Проверить баланс кредитов\n"
+                  "`!daily` - Получить ежедневную награду\n"
+                  "`!rankup` - Повысить ранг\n"
+                  "`!shop` - Открыть имперский рынок\n"
+                  "`!quest` - Выполнить задание",
+            inline=False
+        )
+
         for category, commands_list in self.categories.items():
-            if commands_list:
+            if commands_list and category not in ['other', 'government', 'advertising']:  # Исключаем служебные категории
                 commands_str = ", ".join([f"`{cmd}`" for cmd in commands_list])
                 embed.add_field(
                     name=f"{category.title()}",
                     value=commands_str,
                     inline=False
                 )
+
+        if is_supreme_ruler or ctx.author.guild_permissions.administrator:
+            admin_commands = ", ".join([f"`{cmd}`" for cmd in self.categories['government']])
+            embed.add_field(
+                name="👑 Команды для администрации",
+                value=admin_commands,
+                inline=False
+            )
 
         embed.set_footer(text="Используйте !help <название_модуля> для получения информации о конкретной категории")
         await ctx.send(embed=embed)
