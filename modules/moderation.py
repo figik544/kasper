@@ -303,6 +303,207 @@ class ModerationCog(commands.Cog):
         except Exception as e:
             await ctx.send(f"❌ Не удалось очистить сообщения: {e}")
 
+    @commands.hybrid_command(name='nuke_channel', description='Полностью очистить канал (только для высших администраторов)')
+    @commands.has_permissions(administrator=True)
+    async def nuke_channel(self, ctx):
+        """Полностью очистить канал (только для высших администраторов)"""
+        if not ctx.author.guild_permissions.administrator:
+            await ctx.send("❌ У вас нет прав для выполнения этой команды!")
+            return
+        
+        confirm_embed = discord.Embed(
+            title="⚠️ Подтверждение",
+            description=f"Вы уверены, что хотите полностью очистить канал {ctx.channel.mention}?\n"
+                       f"Все сообщения будут удалены безвозвратно!\n"
+                       f"Для подтверждения введите `!confirm_nuke` в течение 30 секунд.",
+            color=0xFFA500
+        )
+        await ctx.send(embed=confirm_embed)
+        
+        def check(m):
+            return m.author.id == ctx.author.id and m.channel.id == ctx.channel.id and m.content == '!confirm_nuke'
+        
+        try:
+            await self.bot.wait_for('message', check=check, timeout=30.0)
+        except asyncio.TimeoutError:
+            await ctx.send("❌ Время подтверждения истекло. Очистка отменена.")
+            return
+        
+        # Создаем новый канал с тем же именем и настройками
+        overwrites = ctx.channel.overwrites
+        new_channel = await ctx.channel.clone(reason="Nuke command")
+        
+        # Отправляем сообщение о нуке в старый канал перед удалением
+        try:
+            nuke_message = discord.Embed(
+                title="💥 Канал очищен",
+                description=f"Канал {ctx.channel.mention} был полностью очищен пользователем {ctx.author.mention}",
+                color=0xFF0000
+            )
+            await ctx.channel.send(embed=nuke_message)
+        except:
+            pass  # Если не можем отправить сообщение, просто продолжаем
+        
+        # Удаляем старый канал
+        await ctx.channel.delete()
+        
+        # Отправляем сообщение о нуке в новый канал
+        nuke_announce = discord.Embed(
+            title="💥 Канал очищен",
+            description=f"Канал был полностью очищен пользователем {ctx.author.mention}",
+            color=0xFF0000
+        )
+        await new_channel.send(embed=nuke_announce)
+
+    @commands.hybrid_command(name='create_all_channels', description='Создать все необходимые каналы и настроить разрешения')
+    @commands.has_permissions(administrator=True)
+    async def create_all_channels(self, ctx):
+        """Создать все необходимые каналы и настроить разрешения"""
+        if not ctx.author.guild_permissions.administrator:
+            await ctx.send("❌ У вас нет прав для выполнения этой команды!")
+            return
+        
+        # Создаем категории, если они не существуют
+        categories_to_create = [
+            "🏛️ Правительственные",
+            "💰 Экономические",
+            "🎮 Игровые",
+            "🛡️ Безопасность",
+            "📜 Информационные"
+        ]
+        
+        created_categories = []
+        for cat_name in categories_to_create:
+            existing_cat = discord.utils.get(ctx.guild.categories, name=cat_name)
+            if not existing_cat:
+                new_category = await ctx.guild.create_category(cat_name)
+                created_categories.append(new_category.name)
+            else:
+                created_categories.append(f"{existing_cat.name} (уже существует)")
+        
+        # Создаем текстовые каналы, если они не существуют
+        text_channels_to_create = [
+            ("📢-объявления", "канал для официальных объявлений"),
+            ("чат", "основной чат сервера"),
+            ("выборы", "канал для голосования на выборах"),
+            ("голосование", "канал для парламентских голосований"),
+            ("жалобы", "канал для подачи жалоб"),
+            ("репорт", "канал для репортов о нарушениях"),
+            ("архив", "канал для архивирования информации"),
+            ("rules", "канал с правилами сервера")
+        ]
+        
+        created_text_channels = []
+        for channel_name, topic in text_channels_to_create:
+            existing_channel = discord.utils.get(ctx.guild.text_channels, name=channel_name)
+            if not existing_channel:
+                new_channel = await ctx.guild.create_text_channel(
+                    channel_name,
+                    category=discord.utils.get(ctx.guild.categories, name="📜 Информационные"),
+                    topic=topic
+                )
+                created_text_channels.append(new_channel.name)
+            else:
+                created_text_channels.append(f"{existing_channel.name} (уже существует)")
+        
+        # Создаем голосовые каналы, если они не существуют
+        voice_channels_to_create = [
+            ("💬 Основной", 999),
+            ("🔊 Парламент", 99),
+            ("🤫 Тихий", 99),
+            ("🎤 VIP", 9)
+        ]
+        
+        created_voice_channels = []
+        for channel_name, limit in voice_channels_to_create:
+            existing_channel = discord.utils.get(ctx.guild.voice_channels, name=channel_name)
+            if not existing_channel:
+                new_channel = await ctx.guild.create_voice_channel(
+                    channel_name,
+                    category=discord.utils.get(ctx.guild.categories, name="🎮 Игровые"),
+                    user_limit=limit
+                )
+                created_voice_channels.append(new_channel.name)
+            else:
+                created_voice_channels.append(f"{existing_channel.name} (уже существует)")
+        
+        # Настройка разрешений для важных каналов
+        try:
+            # Канал выборов - разрешаем только определенные сообщения
+            voting_channel = discord.utils.get(ctx.guild.text_channels, name="выборы")
+            if voting_channel:
+                # Устанавливаем разрешения: только админы могут отправлять сообщения, остальные могут читать
+                for role in ctx.guild.roles:
+                    if role.permissions.administrator:
+                        await voting_channel.set_permissions(role, send_messages=True)
+                    elif role.name != "@everyone":
+                        await voting_channel.set_permissions(role, send_messages=False)
+        
+            # Канал голосования - только для членов парламента и админов
+            parliament_channel = discord.utils.get(ctx.guild.text_channels, name="голосование")
+            if parliament_channel:
+                parliament_role = discord.utils.get(ctx.guild.roles, name="Член Парламента")
+                if not parliament_role:
+                    parliament_role = await ctx.guild.create_role(name="Член Парламента")
+                
+                # Разрешаем отправку сообщений только админам и членам парламента
+                for role in ctx.guild.roles:
+                    if role.permissions.administrator or role == parliament_role:
+                        await parliament_channel.set_permissions(role, send_messages=True)
+                    elif role.name != "@everyone":
+                        await parliament_channel.set_permissions(role, send_messages=False)
+        
+            # Канал жалоб - все могут писать, но только модераторы могут отвечать
+            complaints_channel = discord.utils.get(ctx.guild.text_channels, name="жалобы")
+            if complaints_channel:
+                mod_role = discord.utils.get(ctx.guild.roles, name="Модератор")
+                if not mod_role:
+                    mod_role = await ctx.guild.create_role(name="Модератор")
+                
+                # Все могут читать и писать
+                await complaints_channel.set_permissions(ctx.guild.default_role, send_messages=True, read_messages=True)
+                # Модераторы и администраторы имеют дополнительные права
+                await complaints_channel.set_permissions(mod_role, manage_messages=True)
+        
+        except Exception as e:
+            print(f"Ошибка при настройке разрешений: {e}")
+        
+        # Формируем сообщение с результатами
+        embed = discord.Embed(
+            title="🏗️ Создание инфраструктуры завершено",
+            description="Были созданы или проверены следующие элементы:",
+            color=0x00FF00
+        )
+        
+        if created_categories:
+            embed.add_field(
+                name="📁 Созданные категории",
+                value="\n".join(created_categories),
+                inline=False
+            )
+        
+        if created_text_channels:
+            embed.add_field(
+                name="📄 Созданные текстовые каналы",
+                value="\n".join(created_text_channels),
+                inline=False
+            )
+        
+        if created_voice_channels:
+            embed.add_field(
+                name="🔊 Созданные голосовые каналы",
+                value="\n".join(created_voice_channels),
+                inline=False
+            )
+        
+        embed.add_field(
+            name="ℹ️ Информация",
+            value="Разрешения для специальных каналов настроены автоматически",
+            inline=False
+        )
+        
+        await ctx.send(embed=embed)
+
     @commands.hybrid_command(name='enable_ads', description='Включить рекламу с заданной частотой')
     @app_commands.describe(frequency_hours='Частота показа рекламы в часах')
     @commands.check(lambda ctx: ctx.author.id == ctx.bot.owner_id or 
