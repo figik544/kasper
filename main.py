@@ -156,15 +156,28 @@ def is_chancellor(user_id):
 
 # Загрузка модулей
 async def load_cogs():
-    # Загрузка модулей
-    await bot.load_extension('modules.help')
-    await bot.load_extension('modules.economy')
-    await bot.load_extension('modules.levels')
-    await bot.load_extension('modules.rpg')
-    await bot.load_extension('modules.star_wars')
-    await bot.load_extension('modules.moderation')
-    await bot.load_extension('modules.government')
-    await bot.load_extension('modules.politics')  # Добавляем новый модуль политики
+    try:
+        # Загрузка модулей
+        modules_to_load = [
+            'modules.help',
+            'modules.economy', 
+            'modules.levels',
+            'modules.rpg',
+            'modules.star_wars',
+            'modules.moderation',
+            'modules.government',
+            'modules.politics'
+        ]
+        
+        for module in modules_to_load:
+            try:
+                await bot.load_extension(module)
+                print(f"Модуль {module} успешно загружен")
+            except Exception as e:
+                print(f"Ошибка при загрузке модуля {module}: {e}")
+                
+    except Exception as e:
+        print(f"Ошибка при загрузке модулей: {e}")
 
 @bot.event
 async def on_ready():
