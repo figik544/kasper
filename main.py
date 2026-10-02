@@ -177,6 +177,13 @@ async def on_ready():
     except Exception as e:
         print(f"Ошибка при синхронизации слэш-команд: {e}")
 
+    # Инициализация базы данных
+    await db.init_db()
+    
+    # Присваиваем базу данных объекту бота
+    bot.db = db
+    bot.config = config
+    
     # Загрузка модулей
     await load_cogs()
     
