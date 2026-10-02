@@ -139,17 +139,19 @@ def is_supreme_ruler(user_id):
     try:
         with open('config.json', 'r', encoding='utf-8') as f:
             config = json.load(f)
-        return str(user_id) == config['government_structure']['supreme_ruler']
-    except:
-        return False
+        return str(user_id) == str(config['government_structure']['supreme_ruler'])
+    except Exception as e:
+        print(f"Ошибка при проверке верховного правителя: {e}")
+        return str(user_id) == "1551842724418822149"
 
 def is_chancellor(user_id):
     """Проверка, является ли пользователь канцлером"""
     try:
         with open('config.json', 'r', encoding='utf-8') as f:
             config = json.load(f)
-        return str(user_id) in config['government_structure']['chancellery']
-    except:
+        return str(user_id) in [str(ch_id) for ch_id in config['government_structure']['chancellery']]
+    except Exception as e:
+        print(f"Ошибка при проверке канцлера: {e}")
         return False
 
 # Загрузка модулей
