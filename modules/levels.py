@@ -12,6 +12,7 @@ class LevelsCog(commands.Cog):
         self.db = db
         # Словарь для отслеживания последнего времени получения опыта пользователем
         self.last_message_time = {}
+        self.max_level = 999  # Увеличиваем максимальный уровень до 999
 
     def is_supreme_ruler(self, user_id):
         """Проверка, является ли пользователь верховным правителем"""
@@ -38,7 +39,7 @@ class LevelsCog(commands.Cog):
         
         level = user_data[3]
         xp = user_data[4]
-        xp_needed = int((level + 1) ** 2 * 10)
+        xp_needed = int((level + 1) ** 2.2 * 15)  # Усложняем систему получения уровня
         balance = await self.db.get_balance(member.id)
         
         # Получаем текущую роль пользователя
@@ -49,7 +50,7 @@ class LevelsCog(commands.Cog):
             color=0x00FFFF
         )
         embed.set_thumbnail(url=member.avatar.url if member.avatar else member.default_avatar.url)
-        embed.add_field(name="Уровень", value=level, inline=True)
+        embed.add_field(name="Уровень", value=f"{level}/{self.max_level}", inline=True)
         embed.add_field(name="Опыт", value=f"{xp}/{xp_needed}", inline=True)
         embed.add_field(name="Кредиты", value=balance, inline=True)
         embed.add_field(name="Ранг", value=current_rank if current_rank else "Новичок", inline=False)
@@ -167,7 +168,7 @@ class LevelsCog(commands.Cog):
                 return
         
         # Проверяем, достаточно ли уровня для повышения
-        required_level = rank_order.index(next_rank) * 5  # каждые 5 уровней - новый ранг
+        required_level = rank_order.index(next_rank) * 10  # теперь каждые 10 уровней - новый ранг
         
         if current_level >= required_level:
             await self.db.set_user_rank(ctx.author.id, next_rank)
@@ -190,7 +191,7 @@ class LevelsCog(commands.Cog):
             )
             await ctx.send(embed=reward_embed)
         else:
-            required_xp = required_level * 20  # примерный расчет
+            required_xp = required_level * 25  # усложняем систему получения опыта
             current_xp = user_data[4]
             
             embed = discord.Embed(
@@ -259,11 +260,12 @@ class LevelsCog(commands.Cog):
         # Подсчитываем статистику
         import aiosqlite
         async with aiosqlite.connect('database.db') as db:
-            cursor = await db.execute('SELECT AVG(level), MAX(level), COUNT(*) FROM users')
-            avg_level, max_level, total_users = await cursor.fetchone()
+            cursor = await db.execute('SELECT AVG(level), MAX(level), MIN(level), COUNT(*) FROM users')
+            avg_level, max_level, min_level, total_users = await cursor.fetchone()
         
         avg_level = avg_level if avg_level else 0
         max_level = max_level if max_level else 0
+        min_level = min_level if min_level else 0
         total_users = total_users if total_users else 0
         
         embed = discord.Embed(
@@ -271,7 +273,8 @@ class LevelsCog(commands.Cog):
             color=0xFFD700
         )
         embed.add_field(name="Средний уровень", value=f"{avg_level:.2f}", inline=True)
-        embed.add_field(name="Максимальный уровень", value=max_level, inline=True)
+        embed.add_field(name="Максимальный уровень", value=f"{max_level}/999", inline=True)
+        embed.add_field(name="Минимальный уровень", value=min_level, inline=True)
         embed.add_field(name="Всего пользователей", value=total_users, inline=True)
         
         # Проверяем, является ли пользователь верховным правителем
@@ -307,7 +310,7 @@ class LevelsCog(commands.Cog):
         if message.author.id in self.last_message_time:
             time_since_last_message = current_time - self.last_message_time[message.author.id]
             # Если прошло меньше 30 секунд, не начисляем опыт
-            if time_since_last_message.total_seconds() < 30:
+            if time_since_last_last_message.total_seconds() < 30:
                 return
         
         is_supreme_ruler = self.is_supreme_ruler(message.author.id)
@@ -336,9 +339,9 @@ class LevelsCog(commands.Cog):
         level = user_data[3]
         xp = user_data[4]
         
-        xp_needed = int((level + 1) ** 2 * 10)
+        xp_needed = int((level + 1) ** 2.2 * 15)  # Усложняем систему получения уровня
         
-        if xp >= xp_needed:
+        if xp >= xp_needed and level < self.max_level:  # Ограничиваем максимальный уровень
             # Повышение уровня
             await self.db.level_up(message.author.id)
             
@@ -373,7 +376,7 @@ class LevelsCog(commands.Cog):
                 
                 if current_rank != "Император":  # не повышаем выше максимального ранга
                     current_index = rank_order.index(current_rank) if current_rank in rank_order else 0
-                    target_index = min(len(rank_order) - 1, new_level // 5)  # каждые 5 уровней - новый ранг
+                    target_index = min(len(rank_order) - 1, new_level // 10)  # теперь каждые 10 уровней - новый ранг
                     
                     if target_index > current_index:
                         new_rank = rank_order[target_index]

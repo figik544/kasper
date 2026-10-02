@@ -47,7 +47,7 @@ class Database:
             # Создание таблицы магазина
             await db.execute('''
                 CREATE TABLE IF NOT EXISTS shop (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id INTEGER PRIMARY KEY,
                     name TEXT UNIQUE,
                     price INTEGER,
                     description TEXT
@@ -60,7 +60,7 @@ class Database:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id INTEGER,
                     item_id INTEGER,
-                    FOREIGN KEY (item_id) REFERENCES shop(id)
+                    FOREIGN KEY (item_id) REFERENCES shop (id)
                 )
             ''')
             
@@ -73,6 +73,49 @@ class Database:
                     strength INTEGER,
                     agility INTEGER,
                     intelligence INTEGER
+                )
+            ''')
+            
+            # Создание таблицы политических партий
+            await db.execute('''
+                CREATE TABLE IF NOT EXISTS political_parties (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    guild_id INTEGER,
+                    name TEXT UNIQUE,
+                    description TEXT,
+                    creation_date TEXT,
+                    leader_id INTEGER
+                )
+            ''')
+            
+            # Создание таблицы участников партий
+            await db.execute('''
+                CREATE TABLE IF NOT EXISTS party_members (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    party_id INTEGER,
+                    joined_date TEXT,
+                    FOREIGN KEY (party_id) REFERENCES political_parties (id)
+                )
+            ''')
+            
+            # Создание таблицы выборов
+            await db.execute('''
+                CREATE TABLE IF NOT EXISTS elections (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    guild_id INTEGER,
+                    election_type TEXT,
+                    scheduled_date TEXT,
+                    completed BOOLEAN DEFAULT 0
+                )
+            ''')
+            
+            # Создание таблицы форм правления
+            await db.execute('''
+                CREATE TABLE IF NOT EXISTS government_types (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    guild_id INTEGER UNIQUE,
+                    gov_type TEXT
                 )
             ''')
             
@@ -246,21 +289,142 @@ class Database:
             result = await cursor.fetchone()
             return result[0] if result else None
 
-    async def create_character(self, user_id, char_class, strength, agility, intelligence):
-        """Создание персонажа для пользователя"""
+
+    async def set_government_type(self, guild_id, gov_type):
+        """Установка формы правления для гильдии"""
         async with aiosqlite.connect(self.db_path) as db:
-            await db.execute('''INSERT OR REPLACE INTO characters 
-                              (user_id, class, strength, agility, intelligence) 
-                              VALUES (?, ?, ?, ?, ?)''',
-                           (user_id, char_class, strength, agility, intelligence))
+            await db.execute(
+                'INSERT OR REPLACE INTO government_types (guild_id, gov_type) VALUES (?, ?)',
+                (guild_id, gov_type)
+            )
             await db.commit()
-
-    async def get_character(self, user_id):
-        """Получение персонажа пользователя"""
+    
+    async def get_government_type(self, guild_id):
+        """Получение формы правления гильдии"""
         async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.execute('SELECT * FROM characters WHERE user_id = ?', (user_id,))
+            cursor = await db.execute('SELECT gov_type FROM government_types WHERE guild_id = ?', (guild_id,))
+            result = await cursor.fetchone()
+            return result[0] if result else None
+    
+    async def create_political_party(self, guild_id, name, description, leader_id):
+        """Создание политической партии"""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                'INSERT INTO political_parties (guild_id, name, description, creation_date, leader_id) VALUES (?, ?, ?, ?, ?)',
+                (guild_id, name, description, datetime.now().isoformat(), leader_id)
+            )
+            party_id = (await db.execute('SELECT last_insert_rowid()')).fetchone()[0]
+                
+            # Добавляем лидера как первого участника партии
+            await db.execute(
+                'INSERT INTO party_members (user_id, party_id, joined_date) VALUES (?, ?, ?)',
+                (leader_id, party_id, datetime.now().isoformat())
+            )
+                
+            await db.commit()
+    
+    async def get_party_by_name(self, guild_id, name):
+        """Получение политической партии по названию"""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute(
+                'SELECT * FROM political_parties WHERE guild_id = ? AND name = ?',
+                (guild_id, name)
+            )
             return await cursor.fetchone()
-
+    
+    async def get_user_party(self, user_id, guild_id):
+        """Получение партии, в которой состоит пользователь"""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute('''
+                SELECT pp.* FROM political_parties pp
+                JOIN party_members pm ON pp.id = pm.party_id
+                WHERE pm.user_id = ? AND pp.guild_id = ?
+            ''', (user_id, guild_id))
+            return await cursor.fetchone()
+    
+    async def add_user_to_party(self, user_id, party_id):
+        """Добавление пользователя в партию"""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                'INSERT INTO party_members (user_id, party_id, joined_date) VALUES (?, ?, ?)',
+                (user_id, party_id, datetime.now().isoformat())
+            )
+            await db.commit()
+    
+    async def remove_user_from_party(self, user_id, party_id):
+        """Удаление пользователя из партии"""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute('DELETE FROM party_members WHERE user_id = ? AND party_id = ?', (user_id, party_id))
+            await db.commit()
+    
+    async def get_server_parties(self, guild_id):
+        """Получение всех партий на сервере"""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute('SELECT * FROM political_parties WHERE guild_id = ?', (guild_id,))
+            return await cursor.fetchall()
+    
+    async def get_parties_count(self, guild_id):
+        """Получение количества партий на сервере"""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute('SELECT COUNT(*) FROM political_parties WHERE guild_id = ?', (guild_id,))
+            result = await cursor.fetchone()
+            return result[0] if result else 0
+    
+    async def get_party_members_count(self, party_id):
+        """Получение количества участников партии"""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute('SELECT COUNT(*) FROM party_members WHERE party_id = ?', (party_id,))
+            result = await cursor.fetchone()
+            return result[0] if result else 0
+    
+    async def delete_party(self, party_id):
+        """Удаление политической партии"""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute('DELETE FROM party_members WHERE party_id = ?', (party_id,))
+            await db.execute('DELETE FROM political_parties WHERE id = ?', (party_id,))
+            await db.commit()
+    
+    async def schedule_election(self, guild_id, election_type, scheduled_date):
+        """Назначение выборов"""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                'INSERT INTO elections (guild_id, election_type, scheduled_date) VALUES (?, ?, ?)',
+                (guild_id, election_type, scheduled_date)
+            )
+            await db.commit()
+    
+    async def get_scheduled_elections(self, guild_id):
+        """Получение запланированных выборов"""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute(
+                'SELECT * FROM elections WHERE guild_id = ? AND completed = 0',
+                (guild_id,)
+            )
+            return await cursor.fetchall()
+    
+    async def get_top_users_by_credits(self, guild_id, limit=99):
+        """Получение топ пользователей по кредитам"""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute(
+                'SELECT id, credits FROM users WHERE guild_id = ? ORDER BY credits DESC LIMIT ?',
+                (guild_id, limit)
+            )
+            return await cursor.fetchall()
+    
+    async def get_total_server_credits(self, guild_id):
+        """Получение общего количества кредитов на сервере"""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute('SELECT SUM(credits) FROM users WHERE guild_id = ?', (guild_id,))
+            result = await cursor.fetchone()
+            return result[0] if result[0] else 0
+    
+    async def get_average_server_level(self, guild_id):
+        """Получение среднего уровня пользователей на сервере"""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute('SELECT AVG(level) FROM users WHERE guild_id = ?', (guild_id,))
+            result = await cursor.fetchone()
+            return result[0] if result[0] else 0
+    
     def is_supreme_ruler(self, user_id):
         """Проверка, является ли пользователь верховным правителем"""
         try:

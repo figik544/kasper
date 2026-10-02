@@ -154,13 +154,15 @@ def is_chancellor(user_id):
 
 # Загрузка модулей
 async def load_cogs():
-    await bot.add_cog(ModerationCog(bot, db))
-    await bot.add_cog(EconomyCog(bot, db))
-    await bot.add_cog(LevelsCog(bot, db))
-    await bot.add_cog(RPGCog(bot, db))
-    await bot.add_cog(StarWarsCog(bot, db))
-    await bot.add_cog(HelpCog(bot))
-    await bot.add_cog(GovernmentCog(bot))
+    # Загрузка модулей
+    await bot.load_extension('modules.help')
+    await bot.load_extension('modules.economy')
+    await bot.load_extension('modules.levels')
+    await bot.load_extension('modules.rpg')
+    await bot.load_extension('modules.star_wars')
+    await bot.load_extension('modules.moderation')
+    await bot.load_extension('modules.government')
+    await bot.load_extension('modules.politics')  # Добавляем новый модуль политики
 
 @bot.event
 async def on_ready():
