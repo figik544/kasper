@@ -119,6 +119,18 @@ class Database:
                 )
             ''')
             
+            # Создание таблицы предвыборных кампаний
+            await db.execute('''
+                CREATE TABLE IF NOT EXISTS election_campaigns (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    guild_id INTEGER,
+                    election_type TEXT,
+                    start_date TEXT,
+                    end_date TEXT,
+                    active BOOLEAN DEFAULT 1
+                )
+            ''')
+            
             await db.commit()
 
     async def create_user(self, user_id, guild_id):
@@ -402,6 +414,26 @@ class Database:
             )
             return await cursor.fetchall()
     
+    async def schedule_election_campaign(self, guild_id, election_type, start_date, end_date):
+        """Запланировать предвыборную кампанию"""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                '''INSERT INTO election_campaigns (guild_id, election_type, start_date, end_date, active) 
+                   VALUES (?, ?, ?, ?, 1)''',
+                (guild_id, election_type, start_date, end_date)
+            )
+            await db.commit()
+
+    async def get_active_campaign(self, guild_id, election_type):
+        """Получить активную кампанию"""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute(
+                '''SELECT * FROM election_campaigns 
+                   WHERE guild_id = ? AND election_type = ? AND active = 1''',
+                (guild_id, election_type)
+            )
+            return await cursor.fetchone()
+
     async def get_top_users_by_credits(self, guild_id, limit=99):
         """Получение топ пользователей по кредитам"""
         async with aiosqlite.connect(self.db_path) as db:

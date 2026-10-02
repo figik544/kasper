@@ -215,7 +215,7 @@ async def on_message(message):
     if message.content.lower().strip() == 'сектор':
         # Определяем права пользователя
         is_supreme = is_supreme_ruler(message.author.id)
-        is_chancellor_user = is_chancellor(message.author.id)
+        is_chancellor_user = is_chancellor(message.author.id)  # Переименовал переменную
         is_admin = message.author.guild_permissions.administrator
 
         # Проверяем, есть ли пользователь в базе
@@ -258,6 +258,8 @@ async def on_message(message):
 - !unwarn - Снятие предупреждения
 - !warnings - Просмотр предупреждений
 - !clear - Очистка сообщений
+- !nuke_channel - Полная очистка канала
+- !create_all_channels - Создание всей инфраструктуры сервера
 - !set_supreme_ruler - Назначить верховного правителя
 - !add_chancellor - Добавить канцлера
 - !remove_chancellor - Удалить канцлера
@@ -272,6 +274,15 @@ async def on_message(message):
 - !declare_emergency - Объявить чрезвычайное положение
 - !revoke_emergency - Отменить чрезвычайное положение
 - !imperial_decree - Издать императорский указ
+- !setup_government - Настроить форму правления
+- !create_political_party - Создать политическую партию
+- !join_party - Присоединиться к партии
+- !leave_party - Покинуть партию
+- !parties_list - Список партий
+- !schedule_elections - Назначить дату выборов
+- !presidential_election - Запустить президентские выборы
+- !parliamentary_election - Запустить парламентские выборы
+- !server_stats - Статистика сервера как государства
             """
         elif is_chancellor_user or is_admin:
             # Команды для канцлеров и администраторов
@@ -298,6 +309,8 @@ async def on_message(message):
 - !unwarn - Снятие предупреждения
 - !warnings - Просмотр предупреждений
 - !clear - Очистка сообщений
+- !nuke_channel - Полная очистка канала
+- !create_all_channels - Создание всей инфраструктуры сервера
 - !add_chancellor - Добавить канцлера
 - !remove_chancellor - Удалить канцлера
 - !set_minister - Назначить министра
@@ -307,6 +320,13 @@ async def on_message(message):
 - !activate_quarantine - Активировать режим карантина
 - !deactivate_quarantine - Деактивировать режим карантина
 - !quarantine_status - Проверить статус карантина
+- !setup_government - Настроить форму правления
+- !create_political_party - Создать политическую партию
+- !join_party - Присоединиться к партии
+- !leave_party - Покинуть партию
+- !parties_list - Список партий
+- !schedule_elections - Назначить дату выборов
+- !server_stats - Статистика сервера как государства
             """
         else:
             # Команды для обычных пользователей
@@ -325,6 +345,10 @@ async def on_message(message):
 - !rankup - Повышение ранга
 - !leaderboard - Таблица лидеров
 - !level_stats - Статистика уровней
+- !create_political_party - Создать политическую партию
+- !join_party - Присоединиться к партии
+- !parties_list - Список партий
+- !server_stats - Статистика сервера как государства
             """
 
         embed = discord.Embed(

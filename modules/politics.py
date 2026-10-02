@@ -192,6 +192,61 @@ class PoliticsCog(commands.Cog):
         
         await ctx.send(embed=embed)
     
+    @commands.hybrid_command(name='election_campaign', description='Начать предвыборную кампанию')
+    @app_commands.describe(election_type='Тип выборов (presidential/parliamentary)', start_date='Дата начала кампании (YYYY-MM-DD)', end_date='Дата окончания кампании (YYYY-MM-DD)')
+    @commands.has_permissions(administrator=True)
+    async def election_campaign(self, ctx, election_type: str, start_date: str, end_date: str):
+        """Начать предвыборную кампанию до назначенной даты выборов"""
+        try:
+            start_datetime = datetime.strptime(start_date, "%Y-%m-%d")
+            end_datetime = datetime.strptime(end_date, "%Y-%m-%d")
+        except ValueError:
+            await ctx.send("❌ Неверный формат даты! Используйте формат YYYY-MM-DD")
+            return
+        
+        if election_type.lower() not in ['presidential', 'parliamentary']:
+            await ctx.send("❌ Неверный тип выборов! Используйте: presidential, parliamentary")
+            return
+        
+        if end_datetime <= start_datetime:
+            await ctx.send("❌ Дата окончания кампании должна быть позже даты начала!")
+            return
+        
+        # Сохраняем данные о предвыборной кампании
+        await self.db.schedule_election_campaign(ctx.guild.id, election_type.lower(), start_datetime.isoformat(), end_datetime.isoformat())
+        
+        # Создаем канал для предвыборной кампании, если его нет
+        campaign_channel_name = f"предвыборная-кампания-{election_type.lower()}"
+        campaign_channel = discord.utils.get(ctx.guild.text_channels, name=campaign_channel_name)
+        
+        if not campaign_channel:
+            campaign_channel = await ctx.guild.create_text_channel(
+                campaign_channel_name,
+                topic=f"Канал для предвыборной кампании по {election_type.lower()} выборам"
+            )
+        
+        embed = discord.Embed(
+            title="선거️ Предвыборная кампания объявлена",
+            description=f"Предвыборная кампания по **{election_type.lower()}** выборам начата!\n"
+                       f"Дата начала: **{start_date}**\n"
+                       f"Дата окончания: **{end_date}**\n"
+                       f"Канал кампании: {campaign_channel.mention}\n\n"
+                       f"Кандидаты могут рекламировать себя, публиковать программы и взаимодействовать с избирателями до дня выборов.",
+            color=0xFFD700
+        )
+        await ctx.send(embed=embed)
+        
+        # Отправляем сообщение в канал кампании
+        campaign_message = (
+            f"**선거️ Предвыборная кампания по {election_type.lower()} выборам**\n"
+            f"Кампания началась! Кандидаты могут публиковать свои программы, проводить дебаты и взаимодействовать с избирателями.\n"
+            f"Дата начала: **{start_date}**\n"
+            f"Дата окончания: **{end_date}**\n\n"
+            f"Публикации, не связанные с выборами, будут удаляться."
+        )
+        
+        await campaign_channel.send(campaign_message)
+
     @commands.hybrid_command(name='schedule_elections', description='Назначить дату выборов')
     @app_commands.describe(election_type='Тип выборов (presidential/parliamentary)', election_date='Дата выборов (YYYY-MM-DD)')
     @commands.has_permissions(administrator=True)
@@ -213,7 +268,8 @@ class PoliticsCog(commands.Cog):
         embed = discord.Embed(
             title="📅 Выборы назначены",
             description=f"Выборы типа **{election_type.lower()}** запланированы на **{election_date}**\n"
-                       f"Система подготовит необходимые каналы в день выборов.",
+                       f"Система подготовит необходимые каналы в день выборов.\n\n"
+                       f"До этой даты участники могут проводить предвыборную кампанию.",
             color=0x00FF00
         )
         await ctx.send(embed=embed)
@@ -367,7 +423,7 @@ class PoliticsCog(commands.Cog):
             
             # Отправляем результаты
             results_message = (
-                "**انتخения завершены!**\n"
+                "**ания завершены!**\n"
                 f"Победила партия: **{winner_name}**\n"
                 f"Количество голосов: **{votes[winner_name]}** из **{valid_votes}**\n"
                 f"Новый президент: {new_president.mention if new_president else 'Неизвестен'}"
